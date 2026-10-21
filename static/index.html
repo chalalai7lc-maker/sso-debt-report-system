@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="ระบบประมวลผลรายงานหนี้ค้างชำระสถานประกอบการ สำนักงานประกันสังคม (SSO Debt Report System)">
+    <title>ระบบประมวลผลรายงานหนี้ค้างชำระสถานประกอบการ (SSO Debt Report System)</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="logo-badge">
+                    <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="header-title">SSO Debt Report System</h1>
+                    <p class="header-subtitle">ระบบประมวลผลรายงานหนี้ค้างชำระและเชื่อมโยงข้อมูลสถานประกอบการ สำนักงานประกันสังคม</p>
+                </div>
+            </div>
+
+            <div class="header-right">
+                <div id="wcf-status-badge" class="badge badge-loading" title="คลิกเพื่อจัดการ Master Data">
+                    <span class="status-dot"></span>
+                    <span id="wcf-status-text">กำลังตรวจสอบ Master Data...</span>
+                </div>
+                <button id="open-master-modal-btn" class="btn-icon-action" title="จัดการ / อัปเดตไฟล์ Master Data (DATA-EMP-WCF.xlsx)">
+                    <svg class="action-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>อัปเดต Master Data</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Master Data Modal -->
+        <div id="master-modal" class="modal-backdrop hidden">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <path d="M2 15h10"></path>
+                            <path d="m9 18 3-3-3-3"></path>
+                        </svg>
+                        จัดการฐานข้อมูลหลักสถานประกอบการ (Master Data)
+                    </h3>
+                    <button id="close-master-modal-btn" class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="master-info-box">
+                        <div class="info-row">
+                            <span class="info-label">ไฟล์ปัจจุบัน:</span>
+                            <span id="master-file-path" class="info-val cell-mono">data/DATA-EMP-WCF.xlsx</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">จำนวนสถานประกอบการ:</span>
+                            <span id="master-records-count" class="info-val text-bold">1,981 แห่ง</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">ปรับปรุงล่าสุดเมื่อ:</span>
+                            <span id="master-last-modified" class="info-val">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">ขนาดไฟล์:</span>
+                            <span id="master-file-size" class="info-val">-</span>
+                        </div>
+                    </div>
+
+                    <div class="master-upload-zone">
+                        <p class="master-upload-text">นำเข้าไฟล์ <code>DATA-EMP-WCF.xlsx</code> ชุดใหม่</p>
+                        <input type="file" id="master-file-input" accept=".xlsx, .xls" class="file-input-hidden">
+                        <div class="master-action-buttons">
+                            <button type="button" id="browse-master-btn" class="btn btn-secondary">
+                                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                                เลือกไฟล์ใหม่จากเครื่อง
+                            </button>
+                            <button type="button" id="reload-disk-btn" class="btn btn-outline" title="โหลดข้อมูลใหม่จากไฟล์ที่มีอยู่ในโฟลเดอร์ data/ ทันที">
+                                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="23 4 23 10 17 10"></polyline>
+                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                                </svg>
+                                รีโหลดจากดิสก์ (Reload)
+                            </button>
+                        </div>
+                        <p id="selected-master-name" class="selected-file-info hidden"></p>
+                    </div>
+
+                    <p id="master-status-msg" class="master-status-msg hidden"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="cancel-master-btn" class="btn btn-outline">ปิด</button>
+                    <button type="button" id="save-master-btn" class="btn btn-primary" disabled>บันทึกและอัปเดตข้อมูล</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <main class="main-content">
+            <!-- Upload & Input Selection Section -->
+            <section class="card upload-section">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        นำเข้าไฟล์รายงานหนี้ค้างชำระ (Excel / CSV)
+                    </h2>
+                    <span class="file-format-hint">รองรับรายงานรหัส CN200090-1 / CN5R013</span>
+                </div>
+
+                <div class="upload-grid">
+                    <!-- Drag & Drop Zone -->
+                    <div id="drop-zone" class="drop-zone">
+                        <input type="file" id="file-input" accept=".xlsx, .xls, .csv" class="file-input-hidden">
+                        <div class="drop-zone-content">
+                            <div class="upload-icon-wrapper">
+                                <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="12" y1="18" x2="12" y2="12"></line>
+                                    <line x1="9" y1="15" x2="15" y2="15"></line>
+                                </svg>
+                            </div>
+                            <p class="drop-text-main">ลากและวางไฟล์รายงานที่นี่ หรือ <button type="button" id="browse-btn" class="link-btn">เลือกไฟล์จากเครื่อง</button></p>
+                            <p class="drop-text-sub">รองรับไฟล์ Excel (.xlsx, .xls) หรือ CSV</p>
+                            <p id="selected-file-name" class="selected-file-info hidden"></p>
+                        </div>
+                    </div>
+
+                    <!-- Existing Files in Input Folder -->
+                    <div class="existing-files-panel">
+                        <h3 class="panel-subtitle">ไฟล์ในโฟลเดอร์ Input ของระบบ</h3>
+                        <div id="input-files-list" class="files-list">
+                            <div class="loading-placeholder">กำลังค้นหาไฟล์...</div>
+                        </div>
+                        <button id="process-btn" class="btn btn-primary btn-full" disabled>
+                            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                            </svg>
+                            เริ่มประมวลผลข้อมูล
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Processing Progress Bar -->
+                <div id="progress-container" class="progress-container hidden">
+                    <div class="progress-bar-wrapper">
+                        <div id="progress-bar" class="progress-bar indeterminate"></div>
+                    </div>
+                    <p id="progress-status" class="progress-status-text">กำลังประมวลผลและเชื่อมโยงข้อมูลกับ SSO WCF...</p>
+                </div>
+            </section>
+
+            <!-- Results Summary KPI Section (Hidden initially) -->
+            <section id="results-section" class="results-section hidden">
+                <div class="kpi-grid">
+                    <!-- Card 1: Principal Debt -->
+                    <div class="kpi-card card-blue">
+                        <div class="kpi-header">
+                            <span class="kpi-label">ยอดหนี้รวม (ไม่รวมเงินเพิ่ม)</span>
+                            <span class="kpi-badge">หนี้ประเมิน + หนี้จริง</span>
+                        </div>
+                        <div class="kpi-value-wrapper">
+                            <span id="kpi-principal" class="kpi-value">0.00</span>
+                            <span class="kpi-unit">บาท</span>
+                        </div>
+                        <p class="kpi-subtext">ยอดเงินต้นที่ต้องติดตามเร่งรัด</p>
+                    </div>
+
+                    <!-- Card 2: Total Establishments -->
+                    <div class="kpi-card card-indigo">
+                        <div class="kpi-header">
+                            <span class="kpi-label">จำนวนสถานประกอบการ</span>
+                            <span class="kpi-badge">ไม่ซ้ำ (บัญชี+สาขา)</span>
+                        </div>
+                        <div class="kpi-value-wrapper">
+                            <span id="kpi-establishments" class="kpi-value">0</span>
+                            <span class="kpi-unit">แห่ง</span>
+                        </div>
+                        <p id="kpi-raw-count" class="kpi-subtext">จากรายงานต้นฉบับ 0 แถว</p>
+                    </div>
+
+                    <!-- Card 3: Grand Total Debt -->
+                    <div class="kpi-card card-amber">
+                        <div class="kpi-header">
+                            <span class="kpi-label">ยอดค้างชำระรวมทั้งสิ้น</span>
+                            <span class="kpi-badge">รวมเงินเพิ่ม</span>
+                        </div>
+                        <div class="kpi-value-wrapper">
+                            <span id="kpi-grand-total" class="kpi-value">0.00</span>
+                            <span class="kpi-unit">บาท</span>
+                        </div>
+                        <p id="kpi-surcharge-info" class="kpi-subtext">เงินเพิ่มรวม 0.00 บาท</p>
+                    </div>
+
+                    <!-- Card 4: WCF Match Rate -->
+                    <div class="kpi-card card-emerald">
+                        <div class="kpi-header">
+                            <span class="kpi-label">อัตราจับคู่ WCF Master</span>
+                            <span class="kpi-badge">ชื่อจริง & ที่อยู่</span>
+                        </div>
+                        <div class="kpi-value-wrapper">
+                            <span id="kpi-match-rate" class="kpi-value">0%</span>
+                            <span class="kpi-unit">สำเร็จ</span>
+                        </div>
+                        <p id="kpi-match-counts" class="kpi-subtext">จับคู่สำเร็จ 0 / 0 แห่ง</p>
+                    </div>
+                </div>
+
+                <!-- Table Preview Card -->
+                <div class="card table-card">
+                    <div class="table-toolbar">
+                        <div class="toolbar-left">
+                            <h2 class="card-title">
+                                <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                                </svg>
+                                ตารางข้อมูลที่ประมวลผลแล้ว
+                            </h2>
+                            <span id="table-count-label" class="table-meta-badge">152 รายการ</span>
+                        </div>
+
+                        <div class="toolbar-right">
+                            <div class="search-box">
+                                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                </svg>
+                                <input type="text" id="search-input" placeholder="ค้นหา เลขที่บัญชี, ชื่อ สปก., อำเภอ..." class="search-input">
+                            </div>
+
+                            <a id="download-btn" href="#" class="btn btn-success" download>
+                                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                ดาวน์โหลด Excel (.xlsx)
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Table Responsive Container -->
+                    <div class="table-container">
+                        <table class="data-table" id="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ลำดับ</th>
+                                    <th>เลขอ้างอิง</th>
+                                    <th>ชื่อสถานประกอบการ (จริง)</th>
+                                    <th>ตำบล</th>
+                                    <th>อำเภอ</th>
+                                    <th>จังหวัด</th>
+                                    <th>รหัสไปรษณีย์</th>
+                                    <th>จำนวนงวด</th>
+                                    <th>งวดเดือนค้างชำระ (แบบ B)</th>
+                                    <th class="text-right">ยอดหนี้ไม่รวมเงินเพิ่ม</th>
+                                    <th class="text-right">เงินเพิ่ม</th>
+                                    <th class="text-right">ยอดรวมทั้งสิ้น</th>
+                                    <th>สถานะ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-body">
+                                <!-- Dynamic Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>ระบบประมวลผลรายงานหนี้ค้างชำระสถานประกอบการ &copy; 2026 | เชื่อมโยงระบบฐานข้อมูล SSO WCF Master Data</p>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
