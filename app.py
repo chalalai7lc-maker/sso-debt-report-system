@@ -1,14 +1,15 @@
 import os
 import shutil
 import datetime
-from typing import Optional
+from typing import List, Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from debt_processor import DebtReportProcessor
 from wcf_integrator import WCFIntegrator, LOCAL_WCF_EXCEL, LOCAL_DATA_DIR
+from letter_service import build_letter_docx, docx_to_pdf
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 INPUT_DIR = os.path.join(BASE_DIR, "Input")
@@ -153,6 +154,63 @@ async def download_file(filename: str):
         filename=safe_filename,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+
+class LetterCaseIn(BaseModel):
+    name: str = ""
+    account: str
+    branch: str = ""
+    periods: List[str] = Field(default_factory=list)
+    street: str = ""
+    district: str = ""
+    province: str = ""
+    zipcode: str = ""
+
+
+class LetterGenerateIn(BaseModel):
+    format: str
+    issue_date: str
+    appoint_date: str
+    warn_start: int
+    invite_start: Optional[int] = None
+    cases: List[LetterCaseIn]
+
+
+@app.post("/api/letters/generate")
+def generate_letters(req: LetterGenerateIn):
+    """พิมพ์หนังสือเตือน+เชิญตามรายที่เลือก เป็น Word หรือ PDF."""
+    fmt = (req.format or "").lower().strip()
+    if fmt not in ("docx", "pdf"):
+        raise HTTPException(status_code=400, detail="รูปแบบต้องเป็น docx หรือ pdf")
+    if not req.cases:
+        raise HTTPException(status_code=400, detail="ไม่มีรายการที่จะพิมพ์")
+    stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    docx_name = f"Letter_Batch_{stamp}.docx"
+    docx_path = os.path.join(OUTPUT_DIR, docx_name)
+    try:
+        build_letter_docx(
+            [case.model_dump() for case in req.cases],
+            issue_date=req.issue_date,
+            appoint_date=req.appoint_date,
+            warn_start=req.warn_start,
+            invite_start=req.invite_start,
+            output_path=docx_path,
+        )
+        if fmt == "pdf":
+            pdf_name = f"Letter_Batch_{stamp}.pdf"
+            pdf_path = os.path.join(OUTPUT_DIR, pdf_name)
+            docx_to_pdf(docx_path, pdf_path)
+            return FileResponse(path=pdf_path, filename=pdf_name, media_type="application/pdf")
+        return FileResponse(
+            path=docx_path,
+            filename=docx_name,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception:
+        raise HTTPException(status_code=500, detail="สร้างหนังสือไม่สำเร็จ")
+
 
 if __name__ == "__main__":
     import uvicorn

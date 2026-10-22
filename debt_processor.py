@@ -328,11 +328,14 @@ class DebtReportProcessor:
                 "ประเภทกิจการ": g["biz_type"],
                 "ชื่อในรายงานหนี้": g["name_report"],
                 "โทรศัพท์": wcf_data.get("โทรศัพท์", ""),
-                "เลขพาณิชย์": wcf_data.get("เลขพาณิชย์", "")
+                "เลขพาณิชย์": wcf_data.get("เลขพาณิชย์", ""),
+                "งวดดิบ": sorted(set(g["periods"])),
             }
             processed_list.append(item)
 
         df_result = pd.DataFrame(processed_list)
+        preview_records = df_result.to_dict(orient="records")
+        export_df = df_result.drop(columns=["งวดดิบ"], errors="ignore")
 
         # จัดเตรียมบันทึกไฟล์ส่งออก
         if not output_dir:
@@ -347,7 +350,7 @@ class DebtReportProcessor:
             excel_filename = custom_filename if custom_filename.endswith(".xlsx") else f"{custom_filename}.xlsx"
 
         output_path = os.path.join(output_dir, excel_filename)
-        self.export_to_excel(df_result, output_path)
+        self.export_to_excel(export_df, output_path)
 
         # สถิติสรุปผล
         total_principal = float(df_result["ยอดหนี้ไม่รวมเงินเพิ่ม"].sum())
@@ -366,7 +369,7 @@ class DebtReportProcessor:
             "grand_total_debt": grand_total,
             "output_file": output_path,
             "output_filename": excel_filename,
-            "preview_data": df_result.to_dict(orient="records")
+            "preview_data": preview_records
         }
 
     def export_to_excel(self, df: pd.DataFrame, output_path: str):

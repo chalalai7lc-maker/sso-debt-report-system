@@ -130,6 +130,11 @@ body {
     font-size: 13px;
     font-weight: 500;
     transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+#wcf-status-badge:hover {
+    filter: brightness(1.15);
 }
 
 .status-dot {
@@ -953,3 +958,44 @@ body {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.4; }
 }
+
+.letter-card { margin-top: 8px; }
+.letter-controls, .letter-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin: 12px 0;
+}
+.letter-field label, .letter-check, .letter-scope label {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+.letter-field input, .letter-field select {
+    width: 100%;
+    margin-top: 4px;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    font-family: var(--font-thai);
+}
+.letter-field input:focus, .letter-field select:focus {
+    outline: none;
+    border-color: var(--border-focus);
+}
+.letter-hint { color: var(--text-muted); font-size: 12.5px; margin: 4px 0 10px; }
+.letter-scope { display: flex; flex-wrap: wrap; gap: 14px; margin: 8px 0 12px; }
+.letter-check { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.letter-summary-bar {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+.letter-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.letter-actions .btn { width: auto; }
+

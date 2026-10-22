@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=20261022c">
 </head>
 <body>
     <div class="app-container">
@@ -29,17 +29,18 @@
             </div>
 
             <div class="header-right">
-                <div id="wcf-status-badge" class="badge badge-loading" title="คลิกเพื่อจัดการ Master Data">
+                <div id="wcf-status-badge" class="badge badge-loading" title="คลิกเพื่ออัปเดต Master Data" role="button">
                     <span class="status-dot"></span>
                     <span id="wcf-status-text">กำลังตรวจสอบ Master Data...</span>
                 </div>
-                <button id="open-master-modal-btn" class="btn-icon-action" title="จัดการ / อัปเดตไฟล์ Master Data (DATA-EMP-WCF.xlsx)">
+                <button id="goto-letter-btn" class="btn-icon-action" title="ไปหน้าพิมพ์หนังสือเตือน-เชิญ">
                     <svg class="action-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                        <path d="M4 4h16v16H4z"></path>
+                        <path d="M8 8h8"></path>
+                        <path d="M8 12h8"></path>
+                        <path d="M8 16h5"></path>
                     </svg>
-                    <span>อัปเดต Master Data</span>
+                    <span>พิมพ์หนังสือ</span>
                 </button>
             </div>
         </header>
@@ -291,6 +292,105 @@
                     </div>
                 </div>
             </section>
+
+            <section id="letter-section" class="card letter-card hidden">
+                <div class="card-header">
+                    <h2 class="card-title">พิมพ์หนังสือเตือน-เชิญ</h2>
+                    <span class="file-format-hint">คู่ฉบับตามฟอร์ม สน ๐๐๓1.1/สท</span>
+                </div>
+                <div class="letter-controls">
+                    <div class="letter-field">
+                        <label for="letter-issue-date">วันที่ออกหนังสือ</label>
+                        <input type="date" id="letter-issue-date">
+                        <p id="letter-issue-preview" class="letter-hint"></p>
+                    </div>
+                    <div class="letter-field">
+                        <label for="letter-appt-date">วันที่นัดพบ (หนังสือเชิญ)</label>
+                        <input type="date" id="letter-appt-date">
+                        <p id="letter-appt-preview" class="letter-hint"></p>
+                    </div>
+                    <div class="letter-field">
+                        <label for="letter-warn-start">เลขเริ่มต้นหนังสือเตือน</label>
+                        <input type="number" id="letter-warn-start" min="1" step="1" placeholder="เช่น 1">
+                    </div>
+                    <div class="letter-field">
+                        <label for="letter-invite-start">เลขเริ่มต้นหนังสือเชิญ</label>
+                        <input type="number" id="letter-invite-start" min="1" step="1" placeholder="เว้นว่าง = เตือน+1">
+                    </div>
+                </div>
+                <p class="letter-hint">กรอกเฉพาะช่องเตือน ระบบสลับเลข: เตือน 1 เชิญ 2 เตือน 3 เชิญ 4 · กรอกทั้งสองช่อง ระบบแยกชุด: เตือน 1,2… และเชิญ 100,101… · เลขในหนังสือไม่เติมศูนย์</p>
+                <div class="letter-scope" id="letter-scope">
+                    <label><input type="radio" name="letter-scope" value="all" checked> พิมพ์ทั้งหมดที่ผ่านตัวกรอง</label>
+                    <label><input type="radio" name="letter-scope" value="selected"> พิมพ์ตามบัญชีที่เลือก</label>
+                    <label><input type="radio" name="letter-scope" value="ge2"> พิมพ์นายจ้างที่ค้าง 2 งวดขึ้นไป</label>
+                </div>
+                <div class="letter-filter-grid">
+                    <div class="letter-field">
+                        <label for="letter-q">เลขบัญชี / สาขา / ชื่อ</label>
+                        <input type="text" id="letter-q" placeholder="เช่น 479 หรือ 000000">
+                    </div>
+                    <div class="letter-field">
+                        <label for="letter-status">สถานะ</label>
+                        <select id="letter-status"><option value="">ทั้งหมด</option></select>
+                    </div>
+                    <div class="letter-field">
+                        <label for="letter-min-periods">จำนวนงวดตั้งแต่</label>
+                        <input type="number" id="letter-min-periods" min="0" step="1" placeholder="ไม่จำกัด">
+                    </div>
+                    <div class="letter-field">
+                        <label for="letter-max-periods">จำนวนงวดไม่เกิน</label>
+                        <input type="number" id="letter-max-periods" min="0" step="1" placeholder="ไม่จำกัด">
+                    </div>
+                    <div class="letter-field">
+                        <label for="letter-month">งวดเดือน</label>
+                        <select id="letter-month">
+                            <option value="">ทุกเดือน</option>
+                            <option value="01">มกราคม</option>
+                            <option value="02">กุมภาพันธ์</option>
+                            <option value="03">มีนาคม</option>
+                            <option value="04">เมษายน</option>
+                            <option value="05">พฤษภาคม</option>
+                            <option value="06">มิถุนายน</option>
+                            <option value="07">กรกฎาคม</option>
+                            <option value="08">สิงหาคม</option>
+                            <option value="09">กันยายน</option>
+                            <option value="10">ตุลาคม</option>
+                            <option value="11">พฤศจิกายน</option>
+                            <option value="12">ธันวาคม</option>
+                        </select>
+                    </div>
+                    <div class="letter-field">
+                        <label for="letter-year">งวดปี พ.ศ.</label>
+                        <input type="number" id="letter-year" min="2500" max="2700" step="1" placeholder="เช่น 2569">
+                    </div>
+                    <div class="letter-field">
+                        <label for="letter-digit-pos">เลขบัญชีหลักที่</label>
+                        <select id="letter-digit-pos">
+                            <option value="">ไม่กรองหลัก</option>
+                            <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                            <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+                            <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+                            <option value="10">10</option>
+                        </select>
+                    </div>
+                    <div class="letter-field">
+                        <label for="letter-digit-val">ค่าของหลักนั้น (0-9)</label>
+                        <select id="letter-digit-val">
+                            <option value="">-</option>
+                            <option>0</option><option>1</option><option>2</option><option>3</option><option>4</option>
+                            <option>5</option><option>6</option><option>7</option><option>8</option><option>9</option>
+                        </select>
+                    </div>
+                </div>
+                <label class="letter-check"><input type="checkbox" id="letter-digit3-9"> เลขบัญชีหลักที่ 3 เป็น 9</label>
+                <p id="letter-summary-bar" class="letter-summary-bar">ยังไม่มีรายการ</p>
+                <div class="letter-actions">
+                    <button type="button" id="letter-docx-btn" class="btn btn-primary">ดาวน์โหลด Word</button>
+                    <button type="button" id="letter-pdf-btn" class="btn btn-success">ดาวน์โหลด PDF</button>
+                </div>
+                <p id="letter-status-msg" class="letter-hint"></p>
+                <div class="table-container" id="letter-table-wrap"></div>
+            </section>
         </main>
 
         <!-- Footer -->
@@ -300,6 +400,7 @@
     </div>
 
     <!-- Scripts -->
-    <script src="/static/js/app.js"></script>
+    <script src="/static/js/app.js?v=20261022b"></script>
+    <script src="/static/js/letters.js?v=20261022b"></script>
 </body>
 </html>

@@ -224,6 +224,8 @@ document.addEventListener("DOMContentLoaded", () => {
         tableCountLabel.textContent = `${allTableRecords.length} รายการ`;
         renderTable(allTableRecords);
 
+        document.dispatchEvent(new CustomEvent("debt:ready", { detail: allTableRecords }));
+
         // Show section & scroll
         resultsSection.classList.remove("hidden");
         resultsSection.scrollIntoView({ behavior: "smooth" });
