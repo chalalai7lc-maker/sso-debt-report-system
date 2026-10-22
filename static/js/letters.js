@@ -27,7 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function digits(value) {
-        return String(value ?? "").replace(/\D/g, "");
+        return String(value ?? "").trim().replace(/\.0$/, "").replace(/\D/g, "");
     }
 
     function rowKey(row) {
@@ -62,6 +62,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function addDays(iso, days) {
+        if (!iso) return "";
         const date = new Date(`${iso}T00:00:00`);
         date.setDate(date.getDate() + days);
         const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -167,16 +168,21 @@ document.addEventListener("DOMContentLoaded", () => {
         const visible = sortRows(filteredRows());
         const printing = printSet(visible);
         const warnStart = readWarnStart();
-        const inviteStart = warnStart ? readInviteStart() : null;
-        const numbers = warnStart ? assignNumbers(printing.length, warnStart, inviteStart) : [];
+        const inviteInvalid = inviteInput.value.trim() && readInviteStart() == null;
+        const inviteStart = warnStart && !inviteInvalid ? readInviteStart() : null;
+        const numbers = warnStart && !inviteInvalid ? assignNumbers(printing.length, warnStart, inviteStart) : [];
         const numberByKey = new Map();
         printing.forEach((row, i) => numberByKey.set(rowKey(row), numbers[i]));
 
         const first = numbers[0];
         const last = numbers[numbers.length - 1];
-        const range = first
-            ? `เตือน ${formatDocNo(first.warn)}–${formatDocNo(last.warn)} · เชิญ ${formatDocNo(first.invite)}–${formatDocNo(last.invite)}`
-            : "ยังไม่ระบุเลขเริ่มต้นหนังสือเตือน";
+        const range = !warnStart
+            ? "ยังไม่ระบุเลขเริ่มต้นหนังสือเตือน"
+            : inviteInvalid
+                ? "เลขเริ่มต้นหนังสือเชิญต้องเป็นจำนวนเต็มตั้งแต่ 1 หรือเว้นว่าง"
+                : !printing.length
+                    ? "ยังไม่มีรายการที่จะพิมพ์"
+                    : `เตือน ${formatDocNo(first.warn)}–${formatDocNo(last.warn)} · เชิญ ${formatDocNo(first.invite)}–${formatDocNo(last.invite)}`;
         const hiddenSelected = printing.filter((row) => !visible.some((item) => rowKey(item) === rowKey(row))).length;
         const hiddenNote = hiddenSelected ? ` · ในจำนวนนี้ซ่อนจากตัวกรอง ${hiddenSelected} ราย แต่จะพิมพ์ด้วย` : "";
         summary.textContent = `แสดง ${visible.length} / ${records.length} ราย · จะพิมพ์ ${printing.length} ราย · ${range}${hiddenNote}`;
@@ -225,8 +231,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function toCase(row) {
         let street = row["ที่อยู่"] || "";
-        const tambon = row["ตำบล"] || "";
-        if (tambon && !street.includes(tambon)) street = `${street} ${tambon}`.trim();
+        const tambon = String(row["ตำบล"] || "").trim().replace(/^(ตำบล|ต\.)\s*/, "");
+        if (tambon && !/(?:ตำบล|ต\.)/.test(street)) street = `${street} ต.${tambon}`.trim();
         return {
             name: displayName(row),
             account: row["เลขที่บัญชี"] || "",

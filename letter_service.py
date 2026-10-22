@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import zipfile
 from copy import deepcopy
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from lxml import etree
@@ -115,8 +116,15 @@ def format_appt_date(iso_date: str) -> str:
     return f"{day:02d}/{month:02d}/{year_be}"
 
 
+def _strip_float_suffix(value: Any) -> str:
+    text = str(value or "").strip()
+    if text.endswith(".0"):
+        text = text[:-2]
+    return text
+
+
 def _digits(value: Any) -> str:
-    return re.sub(r"\D", "", str(value or ""))
+    return re.sub(r"\D", "", _strip_float_suffix(value))
 
 
 def norm_account(value: Any) -> str:
@@ -124,18 +132,12 @@ def norm_account(value: Any) -> str:
 
 
 def norm_branch(value: Any) -> str:
-    text = str(value or "").strip()
-    if text.endswith(".0"):
-        text = text[:-2]
-    digits = _digits(text) or "0"
+    digits = _digits(value) or "0"
     return digits.zfill(6)
 
 
 def norm_zip(value: Any) -> str:
-    text = str(value or "").strip()
-    if text.endswith(".0"):
-        text = text[:-2]
-    return _digits(text)
+    return _digits(value)
 
 
 def _strip_prefix(text: str, prefixes: Tuple[str, ...]) -> str:
@@ -245,6 +247,75 @@ def _page_break():
     return paragraph
 
 
+def _unwrap_sdts(root) -> None:
+    sdt_tag = f"{W}sdt"
+    content_tag = f"{W}sdtContent"
+    for sdt in list(root.iter(sdt_tag)):
+        parent = sdt.getparent()
+        if parent is None:
+            continue
+        content = sdt.find(content_tag)
+        children = list(content) if content is not None else []
+        index = list(parent).index(sdt)
+        parent.remove(sdt)
+        for offset, child in enumerate(children):
+            parent.insert(index + offset, child)
+
+
+def _drop_hidden_shapes(root) -> None:
+    for node in list(root.iter()):
+        if not str(node.tag).endswith("}docPr") or node.get("hidden") != "1":
+            continue
+        run = node
+        while run is not None and not (str(run.tag).endswith("}r") and run.getparent() is not None and str(run.getparent().tag).endswith("}p")):
+            run = run.getparent()
+        if run is not None and run.getparent() is not None:
+            run.getparent().remove(run)
+
+
+def _sanitize_document_xml(xml: bytes) -> bytes:
+    root = etree.fromstring(xml)
+    _unwrap_sdts(root)
+    _drop_hidden_shapes(root)
+    return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
+
+
+def _clean_package_part(name: str, blob: bytes) -> bytes:
+    if name == "word/settings.xml":
+        root = etree.fromstring(blob)
+        for node in list(root.iter(f"{W}mailMerge")):
+            parent = node.getparent()
+            if parent is not None:
+                parent.remove(node)
+        return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
+    if name == "word/_rels/settings.xml.rels":
+        root = etree.fromstring(blob)
+        for node in list(root):
+            if "mailMerge" in (node.get("Type") or ""):
+                root.remove(node)
+        return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
+    if name == "docProps/core.xml":
+        root = etree.fromstring(blob)
+        for node in root.iter("{http://purl.org/dc/elements/1.1/}description"):
+            node.text = ""
+        return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
+    return blob
+
+
+def _find_soffice() -> Optional[str]:
+    found = shutil.which("soffice") or shutil.which("libreoffice")
+    if found:
+        return found
+    if os.name == "nt":
+        for candidate in (
+            r"C:\Program Files\LibreOffice\program\soffice.exe",
+            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+        ):
+            if os.path.exists(candidate):
+                return candidate
+    return None
+
+
 def _apply_tokens(nodes, mapping: Dict[str, str]) -> None:
     for node in nodes:
         for text_node in node.iter(f"{W}t"):
@@ -274,8 +345,8 @@ def build_letter_docx(
     appt_text = format_appt_date(appoint_date)
 
     with zipfile.ZipFile(template_path) as zin:
-        xml = zin.read("word/document.xml")
-        extras = [(info, zin.read(info.filename)) for info in zin.infolist() if info.filename != "word/document.xml"]
+        xml = _sanitize_document_xml(zin.read("word/document.xml"))
+        extras = [(info, _clean_package_part(info.filename, zin.read(info.filename))) for info in zin.infolist() if info.filename != "word/document.xml"]
 
     root = etree.fromstring(xml)
     body = root.find("w:body", NS)
@@ -316,8 +387,8 @@ def build_letter_docx(
 
     new_xml = etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
     flat = new_xml.decode("utf-8")
-    if "{{" in flat or _SAMPLE_ACCOUNT in flat or "โรงเรียนวัดพระธาตุ" in flat:
-        raise ValueError("สร้างหนังสือไม่สำเร็จ: ยังมีช่องว่างหรือข้อมูลตัวอย่าง")
+    if "{{" in flat:
+        raise ValueError("สร้างหนังสือไม่สำเร็จ: ยังมีช่องว่าง")
 
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_DEFLATED) as zout:
@@ -328,7 +399,7 @@ def build_letter_docx(
 
 
 def docx_to_pdf(docx_path: str, pdf_path: str, timeout: int = 180) -> str:
-    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    soffice = _find_soffice()
     if not soffice:
         raise ValueError("เครื่องนี้ไม่มี LibreOffice สำหรับแปลง PDF")
     outdir = os.path.dirname(os.path.abspath(pdf_path))
@@ -336,7 +407,7 @@ def docx_to_pdf(docx_path: str, pdf_path: str, timeout: int = 180) -> str:
     profile = tempfile.mkdtemp(prefix="lo-letter-")
     cmd = [
         soffice, "--headless", "--norestore", "--nofirststartwizard",
-        f"-env:UserInstallation=file://{profile}",
+        f"-env:UserInstallation={Path(profile).as_uri()}",
         "--convert-to", "pdf",
         "--outdir", outdir,
         os.path.abspath(docx_path),

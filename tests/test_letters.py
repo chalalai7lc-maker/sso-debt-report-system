@@ -14,6 +14,7 @@ from letter_service import (
     format_doc_no,
     format_issue_date,
     format_periods_letter,
+    norm_account,
 )
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -31,6 +32,9 @@ class TestLetterNumbers(unittest.TestCase):
 
     def test_parallel_when_both_starts(self):
         self.assertEqual(assign_numbers(2, 1, 100), [(1, 100), (2, 101)])
+
+    def test_account_strips_float_suffix(self):
+        self.assertEqual(norm_account("4700020784.0"), "4700020784")
 
     def test_doc_no_no_padding(self):
         self.assertEqual(format_doc_no(1), "1")
@@ -85,3 +89,29 @@ class TestLetterDocx(unittest.TestCase):
             self.assertNotIn("{{", text)
             self.assertNotIn("4790001695", text)
             self.assertNotIn("โรงเรียนวัดพระธาตุ", text)
+
+    def test_real_sample_account_does_not_block_and_template_is_clean(self):
+        cases = [{
+            "name": "โรงเรียนวัดพระธาตุศรีมงคล",
+            "account": "4790001695",
+            "branch": "0",
+            "periods": ["07/2569"],
+            "street": "99 ถนนทดสอบ",
+            "district": "เมือง",
+            "province": "สกลนคร",
+            "zipcode": "47000",
+        }]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "one.docx")
+            build_letter_docx(cases, "2026-10-22", "2026-11-18", 5, 9, path)
+            with zipfile.ZipFile(path) as zf:
+                document = zf.read("word/document.xml").decode("utf-8")
+                settings = zf.read("word/settings.xml").decode("utf-8")
+                core = zf.read("docProps/core.xml").decode("utf-8")
+            self.assertIn("4790001695", document)
+            self.assertIn("22 ตุลาคม 2569", document)
+            self.assertNotIn("{{", document)
+            self.assertNotIn("mailMerge", settings)
+            self.assertNotIn('hidden="1"', document)
+            self.assertNotIn("dataBinding", document)
+            self.assertNotIn("18 กันยายน 2569", core)
