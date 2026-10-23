@@ -330,19 +330,34 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("letter-docx-btn").addEventListener("click", () => download("docx"));
     document.getElementById("letter-pdf-btn").addEventListener("click", () => download("pdf"));
     document.getElementById("goto-letter-btn").addEventListener("click", () => {
-        if (section.classList.contains("hidden")) {
+        if (!records.length) {
             statusMsg.textContent = "";
             alert("ประมวลผลรายงานหนี้ก่อน แล้วค่อยพิมพ์หนังสือ");
             return;
         }
-        section.scrollIntoView({ behavior: "smooth" });
+        showDesk("letter");
     });
+    document.getElementById("desk-ledger-btn").addEventListener("click", () => showDesk("ledger"));
+
+    function showDesk(name) {
+        const letter = name === "letter";
+        document.body.classList.toggle("desk-letter", letter);
+        document.body.classList.toggle("desk-ledger", !letter);
+        document.getElementById("desk-ledger-btn").classList.toggle("is-active", !letter);
+        document.getElementById("goto-letter-btn").classList.toggle("is-active", letter);
+        document.getElementById("desk-ledger-btn").setAttribute("aria-pressed", letter ? "false" : "true");
+        document.getElementById("goto-letter-btn").setAttribute("aria-pressed", letter ? "true" : "false");
+        document.querySelector(".upload-section").classList.toggle("hidden", letter);
+        document.getElementById("results-section").classList.toggle("hidden", letter || !records.length);
+        section.classList.toggle("hidden", !letter);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }
 
     document.addEventListener("debt:ready", (event) => {
         records = event.detail || [];
         selected = new Set();
         fillStatusOptions();
-        section.classList.remove("hidden");
+        section.classList.add("hidden");
         render();
     });
 });

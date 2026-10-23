@@ -8,10 +8,10 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20261022c">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=20261023a">
 </head>
-<body>
+<body class="desk-ledger">
     <div class="app-container">
         <!-- Header -->
         <header class="app-header">
@@ -33,15 +33,10 @@
                     <span class="status-dot"></span>
                     <span id="wcf-status-text">กำลังตรวจสอบ Master Data...</span>
                 </div>
-                <button id="goto-letter-btn" class="btn-icon-action" title="ไปหน้าพิมพ์หนังสือเตือน-เชิญ">
-                    <svg class="action-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M4 4h16v16H4z"></path>
-                        <path d="M8 8h8"></path>
-                        <path d="M8 12h8"></path>
-                        <path d="M8 16h5"></path>
-                    </svg>
-                    <span>พิมพ์หนังสือ</span>
-                </button>
+            <nav class="desk-nav" aria-label="เลือกงาน">
+                <button type="button" id="desk-ledger-btn" class="desk-tab is-active" aria-pressed="true">รายงานหนี้</button>
+                <button type="button" id="goto-letter-btn" class="desk-tab" aria-pressed="false">พิมพ์หนังสือ</button>
+            </nav>
             </div>
         </header>
 
@@ -293,10 +288,11 @@
                 </div>
             </section>
 
-            <section id="letter-section" class="card letter-card hidden">
-                <div class="card-header">
-                    <h2 class="card-title">พิมพ์หนังสือเตือน-เชิญ</h2>
-                    <span class="file-format-hint">คู่ฉบับตามฟอร์ม สน ๐๐๓1.1/สท</span>
+            <section id="letter-section" class="letter-sheet hidden">
+                <div class="letter-mast">
+                    <p class="letter-kicker">สำนักงานประกันสังคม · หนังสือราชการ</p>
+                    <h2>พิมพ์หนังสือเตือน-เชิญ</h2>
+                    <p>คู่ฉบับตามฟอร์ม สน ๐๐๓1.1/สท</p>
                 </div>
                 <div class="letter-controls">
                     <div class="letter-field">
@@ -401,6 +397,6 @@
 
     <!-- Scripts -->
     <script src="/static/js/app.js?v=20261022b"></script>
-    <script src="/static/js/letters.js?v=20261022d"></script>
+    <script src="/static/js/letters.js?v=20261023a"></script>
 </body>
 </html>
