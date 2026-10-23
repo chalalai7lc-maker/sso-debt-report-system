@@ -41,8 +41,13 @@ class TestLetterNumbers(unittest.TestCase):
         self.assertEqual(format_doc_no(1747), "1747")
 
     def test_period_letter_format(self):
-        self.assertEqual(format_periods_letter(["07/2569", "08/2569"]), "ก.ค.,ส.ค. 2569")
-        self.assertEqual(format_periods_letter(["12/2568", "01/2569"]), "ธ.ค. 2568,ม.ค. 2569")
+        self.assertEqual(format_periods_letter(["06/2569", "07/2569", "08/2569"]), "มิถุนายน-สิงหาคม 2569")
+        self.assertEqual(format_periods_letter(["07/2569"]), "กรกฎาคม 2569")
+        self.assertEqual(
+            format_periods_letter(["04/2569", "05/2569", "07/2569"]),
+            "เมษายน-พฤษภาคม 2569, กรกฎาคม 2569",
+        )
+        self.assertEqual(format_periods_letter(["12/2568", "01/2569"]), "ธันวาคม 2568-มกราคม 2569")
 
     def test_issue_date_be(self):
         self.assertEqual(format_issue_date("2026-09-18"), "18 กันยายน 2569")
@@ -83,7 +88,7 @@ class TestLetterDocx(unittest.TestCase):
             self.assertIn("บริษัททดสอบ จำกัด", text)
             self.assertIn("ห้างทดสอบ", text)
             self.assertIn("1000000001", text)
-            self.assertIn("ก.ค.,ส.ค. 2569", text)
+            self.assertIn("กรกฎาคม-สิงหาคม 2569", text)
             self.assertIn("18 กันยายน 2569", text)
             self.assertIn("18/10/2569", text)
             self.assertNotIn("{{", text)

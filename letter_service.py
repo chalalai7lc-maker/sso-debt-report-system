@@ -23,11 +23,6 @@ THAI_MONTHS = [
     "", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
     "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
 ]
-THAI_MONTHS_SHORT = [
-    "", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
-    "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
-]
-
 # ข้อความตัวอย่างในไฟล์ต้นฉบับ — ใช้ตอนทำ template เท่านั้น ห้ามเหลือในไฟล์ที่พิมพ์
 _SAMPLE_FULL_NAME = "โรงเรียนวัดพระธาตุศรีมงคล และ ศูนย์อบรมเด็กก่อนเกณฑ์วัดพระธาตุศรีมงคล"
 _SAMPLE_ENV_NAME = "โรงเรียนวัดพระธาตุศรีมงคล และ ศูนย์อบรมเ…"
@@ -66,7 +61,7 @@ def format_doc_no(number: int) -> str:
 
 
 def format_periods_letter(period_list: List[str]) -> str:
-    """งวดในหนังสือ แบบฟอร์ม: ก.ค.,ส.ค. 2569 (เดือนย่อ คั่นจุลภาค ปีต่อท้ายกลุ่ม)."""
+    """งวดในหนังสือแบบช่วงเต็ม: มิถุนายน-สิงหาคม 2569. ปีซ้ำไม่พิมพ์สองครั้ง."""
     parsed = []
     for raw in period_list or []:
         parts = str(raw).strip().split("/")
@@ -82,16 +77,27 @@ def format_periods_letter(period_list: List[str]) -> str:
     parsed = sorted(set(parsed))
     if not parsed:
         return "—"
-    groups: List[str] = []
-    idx = 0
-    while idx < len(parsed):
-        year = parsed[idx][0]
-        months = []
-        while idx < len(parsed) and parsed[idx][0] == year:
-            months.append(THAI_MONTHS_SHORT[parsed[idx][1]])
-            idx += 1
-        groups.append(f"{','.join(months)} {year}")
-    return ",".join(groups)
+    groups: List[List[Tuple[int, int]]] = [[parsed[0]]]
+    for item in parsed[1:]:
+        prev_year, prev_month = groups[-1][-1]
+        year, month = item
+        if (year - prev_year) * 12 + (month - prev_month) == 1:
+            groups[-1].append(item)
+        else:
+            groups.append([item])
+    parts = []
+    for group in groups:
+        start_year, start_month = group[0]
+        end_year, end_month = group[-1]
+        if len(group) == 1:
+            parts.append(f"{THAI_MONTHS[start_month]} {start_year}")
+        elif start_year == end_year:
+            parts.append(f"{THAI_MONTHS[start_month]}-{THAI_MONTHS[end_month]} {end_year}")
+        else:
+            parts.append(
+                f"{THAI_MONTHS[start_month]} {start_year}-{THAI_MONTHS[end_month]} {end_year}"
+            )
+    return ", ".join(parts)
 
 
 def parse_ce_iso(value: str) -> Tuple[int, int, int]:
