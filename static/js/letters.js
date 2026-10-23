@@ -17,6 +17,37 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const THAI_MONTHS = ["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
 
+    function formatPeriodsLetter(list) {
+        const parsed = [];
+        (list || []).forEach((raw) => {
+            const parts = String(raw).trim().split("/");
+            if (parts.length !== 2) return;
+            const month = Number(parts[0]);
+            const year = Number(parts[1]);
+            if (month >= 1 && month <= 12 && Number.isInteger(year)) parsed.push([year, month]);
+        });
+        parsed.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+        const unique = [];
+        parsed.forEach((item) => {
+            const prev = unique[unique.length - 1];
+            if (!prev || prev[0] !== item[0] || prev[1] !== item[1]) unique.push(item);
+        });
+        if (!unique.length) return "—";
+        const groups = [[unique[0]]];
+        unique.slice(1).forEach((item) => {
+            const prev = groups[groups.length - 1].at(-1);
+            if ((item[0] - prev[0]) * 12 + (item[1] - prev[1]) === 1) groups[groups.length - 1].push(item);
+            else groups.push([item]);
+        });
+        return groups.map((group) => {
+            const [startYear, startMonth] = group[0];
+            const [endYear, endMonth] = group[group.length - 1];
+            if (group.length === 1) return `${THAI_MONTHS[startMonth]} ${startYear}`;
+            if (startYear === endYear) return `${THAI_MONTHS[startMonth]}-${THAI_MONTHS[endMonth]} ${endYear}`;
+            return `${THAI_MONTHS[startMonth]} ${startYear}-${THAI_MONTHS[endMonth]} ${endYear}`;
+        }).join(", ");
+    }
+
     function escapeHtml(str) {
         return String(str ?? "")
             .replace(/&/g, "&amp;")
@@ -197,7 +228,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <td>${escapeHtml(displayName(row))}</td>
                 <td class="text-center">${escapeHtml(row["สถานะ สปก."] || "-")}</td>
                 <td class="text-center cell-mono">${escapeHtml(row["จำนวนงวดค้าง"] ?? "")}</td>
-                <td>${escapeHtml(row["งวดเดือนค้างชำระ"] || "")}</td>
+                <td>${escapeHtml(formatPeriodsLetter(periodList(row)))}</td>
                 <td class="text-center cell-mono">${nums ? formatDocNo(nums.warn) : "—"}</td>
                 <td class="text-center cell-mono">${nums ? formatDocNo(nums.invite) : "—"}</td>
             </tr>`;

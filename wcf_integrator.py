@@ -11,6 +11,11 @@ LOCAL_WCF_EXCEL = os.path.join(LOCAL_DATA_DIR, "DATA-EMP-WCF.xlsx")
 DEFAULT_WCF_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "SSO_WCF_Report_System", "data"))
 DEFAULT_WCF_EXCEL = os.path.join(DEFAULT_WCF_DIR, "DATA-EMP-WCF.xlsx")
 
+def _strip_dot0(value) -> str:
+    text = str(value or "").strip()
+    return text[:-2] if text.endswith(".0") else text
+
+
 class WCFIntegrator:
     """
     คลาสสำหรับเชื่อมโยงข้อมูลหลักสถานประกอบการ (Master Data) จาก DATA-EMP-WCF.xlsx
@@ -75,7 +80,7 @@ class WCFIntegrator:
             # สร้างคีย์ 'เลขสปก.' รูปแบบ 'เลขที่บัญชี;เลขที่สาขา'
             if "เลขสปก." not in df.columns:
                 if "เลขที่บัญชี" in df.columns and "เลขที่สาขา" in df.columns:
-                    df["เลขสปก."] = df["เลขที่บัญชี"].astype(str).str.strip() + ";" + df["เลขที่สาขา"].astype(str).str.strip()
+                    df["เลขสปก."] = df["เลขที่บัญชี"].map(_strip_dot0) + ";" + df["เลขที่สาขา"].map(_strip_dot0)
                 else:
                     return False
 
@@ -87,10 +92,8 @@ class WCFIntegrator:
 
                 if ";" in raw_key:
                     parts = raw_key.split(";", 1)
-                    k_acc = parts[0].strip()
-                    k_br = parts[1].strip()
-                    if k_br.endswith(".0"):
-                        k_br = k_br[:-2]
+                    k_acc = _strip_dot0(parts[0])
+                    k_br = _strip_dot0(parts[1])
                     k_br = k_br.zfill(6) if k_br.isdigit() else k_br
                     clean_key = f"{k_acc};{k_br}"
                 else:
@@ -128,10 +131,8 @@ class WCFIntegrator:
         """
         self.check_and_reload_if_modified()
 
-        acc_clean = str(acc_no).strip()
-        br_clean = str(branch_no).strip()
-        if br_clean.endswith(".0"):
-            br_clean = br_clean[:-2]
+        acc_clean = _strip_dot0(acc_no)
+        br_clean = _strip_dot0(branch_no)
         br_clean = br_clean.zfill(6) if br_clean.isdigit() else br_clean
 
         ref_key = f"{acc_clean};{br_clean}"

@@ -265,7 +265,7 @@ class DebtReportProcessor:
             "surcharge": 0.0,
             "total_debt": 0.0,
             "steps": [],
-            "step_date": "",
+            "step_dates": [],
             "biz_type": ""
         })
 
@@ -286,8 +286,8 @@ class DebtReportProcessor:
             g["total_debt"] += rec["total_debt"]
             if rec.get("step") and rec["step"] not in g["steps"]:
                 g["steps"].append(rec["step"])
-            if rec.get("step_date"):
-                g["step_date"] = rec["step_date"]
+            if rec.get("step_date") and rec["step_date"] not in g["step_dates"]:
+                g["step_dates"].append(rec["step_date"])
             if not g["biz_type"] and rec["biz_type"]:
                 g["biz_type"] = rec["biz_type"]
 
@@ -324,7 +324,7 @@ class DebtReportProcessor:
                 "ยอดค้างชำระรวมทั้งสิ้น": round(g["total_debt"], 2),
                 "สถานะ สปก.": g["status"],
                 "ขั้นตอน": ", ".join(g["steps"]),
-                "วันที่บันทึกขั้นตอน": g["step_date"],
+                "วันที่บันทึกขั้นตอน": ", ".join(g["step_dates"]),
                 "ประเภทกิจการ": g["biz_type"],
                 "ชื่อในรายงานหนี้": g["name_report"],
                 "โทรศัพท์": wcf_data.get("โทรศัพท์", ""),

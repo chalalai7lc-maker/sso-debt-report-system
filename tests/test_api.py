@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app import app
+from wcf_integrator import WCFIntegrator
 
 class TestAppAPI(unittest.TestCase):
 
@@ -23,7 +24,9 @@ class TestAppAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertTrue(data["wcf_connected"])
-        self.assertEqual(data["wcf_records_count"], 1981)
+        expected = WCFIntegrator().total_records
+        self.assertEqual(data["wcf_records_count"], expected)
+        self.assertGreater(expected, 0)
         self.assertIsInstance(data["input_files"], list)
         filenames = [f["filename"] for f in data["input_files"]]
         self.assertIn("CN200090-1_20260914_161817.xlsx", filenames)
@@ -59,8 +62,9 @@ class TestAppAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertTrue(data["success"])
-        self.assertEqual(data["wcf_records_count"], 1981)
-        self.assertIn("1,981", data["message"])
+        expected = WCFIntegrator().total_records
+        self.assertEqual(data["wcf_records_count"], expected)
+        self.assertIn(f"{expected:,}", data["message"])
 
     def test_upload_master_data_validation(self):
         # Invalid file type

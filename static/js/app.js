@@ -242,9 +242,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const tr = document.createElement("tr");
             const statusVal = row["สถานะ สปก."] || "default";
             const statusClass = `status-${escapeHtml(statusVal)}`;
+            const reportName = row["ชื่อในรายงานหนี้"] || "";
             const nameDisplay = row["ชื่อสถานประกอบการ (จริง)"]
                 ? escapeHtml(row["ชื่อสถานประกอบการ (จริง)"])
-                : '<span style="color: var(--text-muted); font-style: italic;">[ไม่พบใน WCF - ตรวจสอบด้วยตนเอง]</span>';
+                : `${escapeHtml(reportName)} <span style="color: var(--text-muted); font-style: italic;">[ไม่พบใน WCF - ตรวจสอบด้วยตนเอง]</span>`;
 
             tr.innerHTML = `
                 <td class="text-center cell-mono">${idx + 1}</td>

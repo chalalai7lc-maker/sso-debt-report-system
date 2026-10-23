@@ -1116,4 +1116,25 @@ body.desk-letter .data-table tbody tr:hover { background: #fff4e6; }
     .letter-sheet { padding: 18px 14px; }
     .letter-mast h2 { font-size: 26px; }
 }
+body.desk-ledger .badge-connected,
+body.desk-letter .badge-connected,
+body.desk-ledger .master-status-msg.success,
+body.desk-letter .master-status-msg.success,
+body.desk-ledger .selected-file-info,
+body.desk-letter .selected-file-info,
+body.desk-ledger .text-bold,
+body.desk-letter .text-bold {
+    color: #0f6b45;
+    background: #e5f6ee;
+    border-color: #b7e4c7;
+}
+body.desk-ledger .badge-connected .status-dot,
+body.desk-letter .badge-connected .status-dot { background: #0f6b45; box-shadow: none; }
+body.desk-ledger .table-meta-badge,
+body.desk-letter .table-meta-badge { color: #1d4e89; background: #e7f0fa; }
+body.desk-ledger .master-upload-zone,
+body.desk-letter .master-upload-zone {
+    background: #fff;
+    border-color: #c5d2de;
+}
 

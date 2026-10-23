@@ -51,6 +51,10 @@ class TestLetterNumbers(unittest.TestCase):
 
     def test_issue_date_be(self):
         self.assertEqual(format_issue_date("2026-09-18"), "18 กันยายน 2569")
+        with self.assertRaises(ValueError):
+            format_issue_date("2026-02-31")
+        with self.assertRaises(ValueError):
+            format_issue_date("2026-04-31")
 
 
 class TestLetterDocx(unittest.TestCase):

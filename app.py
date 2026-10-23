@@ -1,6 +1,7 @@
 import os
 import shutil
 import datetime
+import tempfile
 from typing import List, Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -45,15 +46,20 @@ async def get_system_info():
     wcf_integrator.check_and_reload_if_modified()
 
     input_files = []
-    if os.path.exists(INPUT_DIR):
+    if os.path.isdir(INPUT_DIR):
         for fname in os.listdir(INPUT_DIR):
-            if fname.lower().endswith(('.xlsx', '.xls', '.csv')):
-                fpath = os.path.join(INPUT_DIR, fname)
-                size_kb = round(os.path.getsize(fpath) / 1024, 1)
-                input_files.append({
-                    "filename": fname,
-                    "size_kb": size_kb
-                })
+            if fname.startswith(("~$", ".")):
+                continue
+            if not fname.lower().endswith((".xlsx", ".xls", ".csv")):
+                continue
+            fpath = os.path.join(INPUT_DIR, fname)
+            if not os.path.isfile(fpath):
+                continue
+            size_kb = round(os.path.getsize(fpath) / 1024, 1)
+            input_files.append({
+                "filename": fname,
+                "size_kb": size_kb
+            })
 
     return {
         "wcf_connected": wcf_integrator.is_loaded,
@@ -73,12 +79,18 @@ async def upload_master_data(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="กรุณาอัปโหลดไฟล์ Master Data นามสกุล .xlsx เท่านั้น")
 
     target_path = LOCAL_WCF_EXCEL
+    suffix = os.path.splitext(file.filename or "")[1].lower() or ".xlsx"
+    fd, tmp_path = tempfile.mkstemp(suffix=suffix)
+    os.close(fd)
     try:
-        # บันทึกไฟล์ใหม่ทับที่ data/DATA-EMP-WCF.xlsx
-        with open(target_path, "wb") as buffer:
+        with open(tmp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-
-        # โหลดเข้าสู่ Memory ทันที
+        probe = WCFIntegrator(tmp_path)
+        if not probe.is_loaded or probe.total_records < 1:
+            raise HTTPException(status_code=400, detail="ไฟล์ที่อัปโหลดไม่มี Sheet 'WCF' หรือโครงสร้างข้อมูลไม่ถูกต้อง")
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+        os.replace(tmp_path, target_path)
+        tmp_path = ""
         success = wcf_integrator.load_master_data(target_path)
         if not success:
             raise HTTPException(status_code=400, detail="ไฟล์ที่อัปโหลดไม่มี Sheet 'WCF' หรือโครงสร้างข้อมูลไม่ถูกต้อง")
@@ -94,6 +106,9 @@ async def upload_master_data(file: UploadFile = File(...)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"เกิดข้อผิดพลาดในการบันทึก Master Data: {str(e)}")
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
 @app.post("/api/reload-master-data")
 async def reload_master_data():
@@ -132,7 +147,7 @@ async def process_existing(req: ExistingProcessRequest):
     """ประมวลผลไฟล์ที่มีอยู่แล้วในโฟลเดอร์ Input"""
     safe_filename = os.path.basename(req.filename)
     target_path = os.path.abspath(os.path.join(INPUT_DIR, safe_filename))
-    if not target_path.startswith(os.path.abspath(INPUT_DIR)) or not os.path.exists(target_path):
+    if not target_path.startswith(os.path.abspath(INPUT_DIR)) or not os.path.isfile(target_path):
         raise HTTPException(status_code=404, detail="ไม่พบไฟล์ที่ระบุในโฟลเดอร์ Input")
 
     try:
@@ -146,7 +161,7 @@ async def download_file(filename: str):
     """ดาวน์โหลดไฟล์ผลลัพธ์ Excel"""
     safe_filename = os.path.basename(filename)
     file_path = os.path.abspath(os.path.join(OUTPUT_DIR, safe_filename))
-    if not file_path.startswith(os.path.abspath(OUTPUT_DIR)) or not os.path.exists(file_path):
+    if not file_path.startswith(os.path.abspath(OUTPUT_DIR)) or not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="ไม่พบไฟล์ที่ต้องการดาวน์โหลด")
 
     return FileResponse(

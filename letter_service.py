@@ -1,5 +1,6 @@
 """สร้างหนังสือเตือน + เชิญจากฟอร์มราชการ โดยไม่ทิ้งข้อมูลตัวอย่างของต้นฉบับ."""
 
+import datetime
 import os
 import re
 import shutil
@@ -107,8 +108,12 @@ def parse_ce_iso(value: str) -> Tuple[int, int, int]:
     if not match:
         raise ValueError("วันที่ต้องเป็นรูปแบบ YYYY-MM-DD")
     year_ce, month, day = (int(match.group(1)), int(match.group(2)), int(match.group(3)))
-    if not (1 <= month <= 12 and 1 <= day <= 31 and 1900 <= year_ce <= 2400):
+    if not (1900 <= year_ce <= 2400):
         raise ValueError("วันที่ไม่ถูกต้อง")
+    try:
+        datetime.date(year_ce, month, day)
+    except ValueError as exc:
+        raise ValueError("วันที่ไม่ถูกต้อง") from exc
     return day, month, year_ce + 543
 
 
