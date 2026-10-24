@@ -129,9 +129,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const year = document.getElementById("letter-year").value.trim();
         if (!month && !year) return true;
         return periodList(row).some((p) => {
-            const [mm, yy] = String(p).split("/");
-            if (month && mm !== month) return false;
-            if (year && yy !== year) return false;
+            const [mm, yy] = String(p).trim().split("/");
+            if (month && Number(mm) !== Number(month)) return false;
+            if (year && String(yy ?? "").trim() !== year) return false;
             return true;
         });
     }
@@ -262,8 +262,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function toCase(row) {
         let street = row["ที่อยู่"] || "";
-        const tambon = String(row["ตำบล"] || "").trim().replace(/^(ตำบล|ต\.)\s*/, "");
-        if (tambon && !/(?:ตำบล|ต\.)/.test(street)) street = `${street} ต.${tambon}`.trim();
+        const province = String(row["จังหวัด"] || "").trim();
+        const isBkk = province.includes("กรุงเทพ") || province === "กทม" || province === "กทม.";
+        const tambon = String(row["ตำบล"] || "").trim().replace(/^(ตำบล|ต\.|แขวง)\s*/, "");
+        if (tambon && !/(?:ตำบล|ต\.|แขวง)/.test(street)) {
+            street = `${street} ${isBkk ? `แขวง${tambon}` : `ต.${tambon}`}`.trim();
+        }
         return {
             name: displayName(row),
             account: row["เลขที่บัญชี"] || "",
@@ -271,7 +275,7 @@ document.addEventListener("DOMContentLoaded", () => {
             periods: periodList(row),
             street,
             district: row["อำเภอ"] || "",
-            province: row["จังหวัด"] || "",
+            province,
             zipcode: String(row["รหัสไปรษณีย์"] || ""),
         };
     }

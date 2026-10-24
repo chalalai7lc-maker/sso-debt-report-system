@@ -15,6 +15,7 @@ from letter_service import (
     format_issue_date,
     format_periods_letter,
     norm_account,
+    norm_zip,
 )
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -123,4 +124,29 @@ class TestLetterDocx(unittest.TestCase):
             self.assertNotIn("mailMerge", settings)
             self.assertNotIn('hidden="1"', document)
             self.assertNotIn("dataBinding", document)
+            self.assertNotIn("MERGEFIELD", document)
+            self.assertNotIn("fldChar", document)
             self.assertNotIn("18 กันยายน 2569", core)
+
+    def test_bangkok_and_zero_zipcode_formatting(self):
+        self.assertEqual(norm_zip("0"), "")
+        self.assertEqual(norm_zip("0.0"), "")
+        self.assertEqual(norm_zip("10300.0"), "10300")
+        cases = [{
+            "name": "โครงการทดสอบ กทม",
+            "account": "1090049838",
+            "branch": "470001",
+            "periods": ["7/2569"],
+            "street": "สวนจิตรลดา แขวงสวนจิตรลดา",
+            "district": "ดุสิต",
+            "province": "กรุงเทพมหานคร",
+            "zipcode": "0",
+        }]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "bkk.docx")
+            build_letter_docx(cases, "2026-10-24", "2026-11-24", 10, None, path)
+            text = _docx_text(path)
+            self.assertIn("เขตดุสิต กรุงเทพมหานคร", text)
+            self.assertNotIn("อ.ดุสิต", text)
+            self.assertNotIn("จ.กรุงเทพมหานคร", text)
+            self.assertNotIn("กรุงเทพมหานคร 0", text)

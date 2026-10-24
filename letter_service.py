@@ -148,7 +148,13 @@ def norm_branch(value: Any) -> str:
 
 
 def norm_zip(value: Any) -> str:
-    return _digits(value)
+    digits = _digits(value)
+    return "" if set(digits) <= {"0"} else digits
+
+
+def _is_bangkok(province: str) -> bool:
+    cleaned = (province or "").strip()
+    return "กรุงเทพ" in cleaned or cleaned in ("กทม", "กทม.")
 
 
 def _strip_prefix(text: str, prefixes: Tuple[str, ...]) -> str:
@@ -284,10 +290,43 @@ def _drop_hidden_shapes(root) -> None:
             run.getparent().remove(run)
 
 
+def _strip_merge_fields(root) -> None:
+    for r in list(root.iter(f"{W}r")):
+        parent = r.getparent()
+        if parent is None:
+            continue
+        if r.find(f"{W}fldChar") is not None or r.find(f"{W}instrText") is not None:
+            parent.remove(r)
+            continue
+        children = [c for c in r if c.tag != f"{W}rPr"]
+        if len(children) == 1 and children[0].tag == f"{W}t" and not (children[0].text or ""):
+            parent.remove(r)
+
+    for p in root.iter(f"{W}p"):
+        txt = "".join(n.text or "" for n in p.iter(f"{W}t"))
+        if "{{ENV_NAME}}" in txt and not list(p.iter(f"{W}drawing")):
+            runs = p.findall(f"{W}r")
+            for idx, r in enumerate(runs[:-1]):
+                t1 = r.find(f"{W}t")
+                t2 = runs[idx + 1].find(f"{W}t")
+                if t1 is not None and t2 is not None and (t1.text or "").endswith(" ") and (t2.text or "") == " ":
+                    p.remove(runs[idx + 1])
+                    break
+        elif "{{NAME}}" in txt:
+            runs = p.findall(f"{W}r")
+            for idx, r in enumerate(runs[:-1]):
+                has_tab = r.find(f"{W}tab") is not None
+                t2 = runs[idx + 1].find(f"{W}t")
+                if has_tab and t2 is not None and (t2.text or "") == " ":
+                    p.remove(runs[idx + 1])
+                    break
+
+
 def _sanitize_document_xml(xml: bytes) -> bytes:
     root = etree.fromstring(xml)
     _unwrap_sdts(root)
     _drop_hidden_shapes(root)
+    _strip_merge_fields(root)
     return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
 
 
@@ -327,11 +366,15 @@ def _find_soffice() -> Optional[str]:
     return None
 
 
-def _apply_tokens(nodes, mapping: Dict[str, str]) -> None:
+def _apply_tokens(nodes, mapping: Dict[str, str], is_bkk: bool = False) -> None:
     for node in nodes:
         for text_node in node.iter(f"{W}t"):
             current = text_node.text or ""
-            if current in mapping:
+            if is_bkk and current == "อ.":
+                text_node.text = "เขต"
+            elif is_bkk and current == " จ.":
+                text_node.text = " "
+            elif current in mapping:
                 text_node.text = mapping[current]
 
 
@@ -374,8 +417,10 @@ def build_letter_docx(
         name = re.sub(r"\s+", " ", str(case.get("name") or "").strip()) or "สถานประกอบการ"
         periods = format_periods_letter(case.get("periods") or [])
         street = _strip_prefix(str(case.get("street") or ""), ("ที่อยู่",)) or "-"
+        raw_province = str(case.get("province") or "")
+        is_bkk = _is_bangkok(raw_province)
         district = _strip_prefix(str(case.get("district") or ""), ("อำเภอ", "อ.", "เขต")) or "-"
-        province = _strip_prefix(str(case.get("province") or ""), ("จังหวัด", "จ.")) or "-"
+        province = "กรุงเทพมหานคร" if is_bkk else (_strip_prefix(raw_province, ("จังหวัด", "จ.")) or "-")
         warn_no, invite_no = numbers[index]
         _apply_tokens(clones, {
             "{{WARN_NO}}": format_doc_no(warn_no),
@@ -391,7 +436,7 @@ def build_letter_docx(
             "{{DISTRICT}}": district[:40],
             "{{PROVINCE}}": province[:40],
             "{{ZIP}}": norm_zip(case.get("zipcode")),
-        })
+        }, is_bkk=is_bkk)
         for el in clones:
             body.append(el)
     body.append(sect)
