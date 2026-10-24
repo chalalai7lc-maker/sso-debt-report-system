@@ -34,10 +34,11 @@ processor = DebtReportProcessor(wcf_integrator=wcf_integrator)
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
     index_path = os.path.join(STATIC_DIR, "index.html")
+    headers = {"Cache-Control": "no-cache, no-store, must-revalidate"}
     if os.path.exists(index_path):
         with open(index_path, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    return HTMLResponse("<h1>SSO Debt Report System</h1><p>Static index.html not found.</p>")
+            return HTMLResponse(content=f.read(), headers=headers)
+    return HTMLResponse("<h1>SSO Debt Report System</h1><p>Static index.html not found.</p>", headers=headers)
 
 @app.get("/api/system-info")
 async def get_system_info():
