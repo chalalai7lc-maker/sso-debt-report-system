@@ -10,7 +10,13 @@ from pydantic import BaseModel, Field
 
 from debt_processor import DebtReportProcessor
 from wcf_integrator import WCFIntegrator, LOCAL_WCF_EXCEL, LOCAL_DATA_DIR
-from letter_service import build_letter_docx, docx_to_pdf
+from letter_service import (
+    build_letter_docx,
+    docx_to_pdf,
+    load_letter_config,
+    save_letter_config,
+    DEFAULT_LETTER_CONFIG,
+)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 INPUT_DIR = os.path.join(BASE_DIR, "Input")
@@ -183,12 +189,46 @@ class LetterCaseIn(BaseModel):
     zipcode: str = ""
 
 
+class LetterConfigIn(BaseModel):
+    doc_code: Optional[str] = None
+    office_name: Optional[str] = None
+    office_location: Optional[str] = None
+    office_address: Optional[str] = None
+    signatory_name: Optional[str] = None
+    signatory_position: Optional[str] = None
+    owner_division: Optional[str] = None
+    phone: Optional[str] = None
+    fax: Optional[str] = None
+
+
+@app.get("/api/letter-config")
+def get_letter_config():
+    """ดึงข้อมูลตั้งค่าหนังสือราชการ 8 รายการ พร้อมค่าเริ่มต้น."""
+    return {
+        "status": "success",
+        "config": load_letter_config(),
+        "defaults": DEFAULT_LETTER_CONFIG,
+    }
+
+
+@app.post("/api/letter-config")
+def update_letter_config(cfg: LetterConfigIn):
+    """บันทึกข้อมูลตั้งค่าหนังสือราชการ 8 รายการ."""
+    saved = save_letter_config(cfg.model_dump(exclude_unset=True))
+    return {
+        "status": "success",
+        "message": "บันทึกข้อมูลหนังสือราชการสำเร็จ",
+        "config": saved,
+    }
+
+
 class LetterGenerateIn(BaseModel):
     format: str
     issue_date: str
     appoint_date: str
     warn_start: int
     invite_start: Optional[int] = None
+    config: Optional[LetterConfigIn] = None
     cases: List[LetterCaseIn]
 
 
@@ -204,6 +244,7 @@ def generate_letters(req: LetterGenerateIn):
     docx_name = f"Letter_Batch_{stamp}.docx"
     docx_path = os.path.join(OUTPUT_DIR, docx_name)
     try:
+        cfg_dict = req.config.model_dump(exclude_unset=True) if req.config else None
         build_letter_docx(
             [case.model_dump() for case in req.cases],
             issue_date=req.issue_date,
@@ -211,6 +252,7 @@ def generate_letters(req: LetterGenerateIn):
             warn_start=req.warn_start,
             invite_start=req.invite_start,
             output_path=docx_path,
+            config=cfg_dict,
         )
         if fmt == "pdf":
             pdf_name = f"Letter_Batch_{stamp}.pdf"

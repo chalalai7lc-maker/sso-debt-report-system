@@ -14,6 +14,130 @@ document.addEventListener("DOMContentLoaded", () => {
     let records = [];
     let selected = new Set();
     let apptTouched = false;
+    let letterConfig = null;
+    let defaultLetterConfig = null;
+
+    // Config Modal Elements
+    const configModal = document.getElementById("letter-config-modal");
+    const openConfigBtn = document.getElementById("open-letter-config-btn");
+    const closeConfigBtn = document.getElementById("close-letter-config-btn");
+    const cancelConfigBtn = document.getElementById("cancel-letter-config-btn");
+    const saveConfigBtn = document.getElementById("save-letter-config-btn");
+    const resetConfigBtn = document.getElementById("reset-letter-config-btn");
+    const cfgStatusMsg = document.getElementById("cfg-status-msg");
+    const mastSubtitle = document.getElementById("letter-mast-subtitle");
+
+    const cfgInputs = {
+        doc_code: document.getElementById("cfg-doc-code"),
+        office_name: document.getElementById("cfg-office-name"),
+        office_location: document.getElementById("cfg-office-location"),
+        office_address: document.getElementById("cfg-office-address"),
+        signatory_name: document.getElementById("cfg-signatory-name"),
+        signatory_position: document.getElementById("cfg-signatory-position"),
+        owner_division: document.getElementById("cfg-owner-division"),
+        phone: document.getElementById("cfg-phone"),
+        fax: document.getElementById("cfg-fax"),
+    };
+
+    async function loadConfig() {
+        try {
+            const res = await fetch("/api/letter-config");
+            if (res.ok) {
+                const data = await res.json();
+                letterConfig = data.config || {};
+                defaultLetterConfig = data.defaults || {};
+                if (mastSubtitle && letterConfig.doc_code) {
+                    mastSubtitle.textContent = `คู่ฉบับตามฟอร์ม ${letterConfig.doc_code}`;
+                }
+            }
+        } catch (e) {
+            console.error("Failed to load letter config:", e);
+        }
+    }
+
+    function populateConfigForm(cfg) {
+        if (!cfg) return;
+        Object.keys(cfgInputs).forEach((key) => {
+            if (cfgInputs[key]) {
+                cfgInputs[key].value = cfg[key] || "";
+            }
+        });
+    }
+
+    function readConfigForm() {
+        const result = {};
+        Object.keys(cfgInputs).forEach((key) => {
+            if (cfgInputs[key]) {
+                result[key] = cfgInputs[key].value.trim();
+            }
+        });
+        return result;
+    }
+
+    if (openConfigBtn) {
+        openConfigBtn.addEventListener("click", async () => {
+            await loadConfig();
+            populateConfigForm(letterConfig);
+            if (cfgStatusMsg) {
+                cfgStatusMsg.className = "master-status-msg hidden";
+                cfgStatusMsg.textContent = "";
+            }
+            if (configModal) configModal.classList.remove("hidden");
+        });
+    }
+
+    function hideConfigModal() {
+        if (configModal) configModal.classList.add("hidden");
+    }
+
+    if (closeConfigBtn) closeConfigBtn.addEventListener("click", hideConfigModal);
+    if (cancelConfigBtn) cancelConfigBtn.addEventListener("click", hideConfigModal);
+
+    if (resetConfigBtn) {
+        resetConfigBtn.addEventListener("click", () => {
+            if (confirm("ต้องการคืนค่าเริ่มต้นทั้งหมดใช่หรือไม่?")) {
+                populateConfigForm(defaultLetterConfig || {});
+            }
+        });
+    }
+
+    if (saveConfigBtn) {
+        saveConfigBtn.addEventListener("click", async () => {
+            const payload = readConfigForm();
+            saveConfigBtn.disabled = true;
+            if (cfgStatusMsg) {
+                cfgStatusMsg.className = "master-status-msg";
+                cfgStatusMsg.textContent = "กำลังบันทึกข้อมูล...";
+            }
+            try {
+                const res = await fetch("/api/letter-config", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+                if (!res.ok) throw new Error("บันทึกไม่สำเร็จ");
+                const data = await res.json();
+                letterConfig = data.config || payload;
+                if (mastSubtitle && letterConfig.doc_code) {
+                    mastSubtitle.textContent = `คู่ฉบับตามฟอร์ม ${letterConfig.doc_code}`;
+                }
+                if (cfgStatusMsg) {
+                    cfgStatusMsg.className = "master-status-msg success";
+                    cfgStatusMsg.textContent = "✅ บันทึกข้อมูลเรียบร้อยแล้ว";
+                }
+                setTimeout(hideConfigModal, 800);
+            } catch (err) {
+                if (cfgStatusMsg) {
+                    cfgStatusMsg.className = "master-status-msg error";
+                    cfgStatusMsg.textContent = `❌ ${err.message}`;
+                }
+            } finally {
+                saveConfigBtn.disabled = false;
+            }
+        });
+    }
+
+    loadConfig();
 
     const THAI_MONTHS = ["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
 
@@ -312,6 +436,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     appoint_date: apptInput.value,
                     warn_start: warnStart,
                     invite_start: readInviteStart(),
+                    config: letterConfig || undefined,
                     cases: printing.map(toCase),
                 }),
             });

@@ -108,6 +108,71 @@
             </div>
         </div>
 
+        <!-- Letter Config Modal -->
+        <div id="letter-config-modal" class="modal-backdrop hidden">
+            <div class="modal-card" style="max-width: 640px;">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                        ตั้งค่าข้อมูลหนังสือราชการ (8 รายการ)
+                    </h3>
+                    <button id="close-letter-config-btn" class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="letter-hint" style="margin-bottom: 14px;">ข้อมูลนี้จะถูกบันทึกเป็นค่าหลักสำหรับใช้สร้างหนังสือเตือนและหนังสือเชิญทั้งหมด</p>
+                    <div class="config-grid">
+                        <div class="config-field">
+                            <label for="cfg-doc-code">1. รหัสเอกสาร</label>
+                            <input type="text" id="cfg-doc-code" placeholder="เช่น สน ๐๐๓1.1/สท">
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-office-name">2. ชื่อหน่วยงาน</label>
+                            <input type="text" id="cfg-office-name" placeholder="เช่น สำนักงานประกันสังคมจังหวัดสกลนคร สาขาสว่างแดนดิน">
+                        </div>
+                        <div class="config-field full-width">
+                            <label for="cfg-office-location">3. ที่ตั้งหน่วยงาน (หัวกระดาษ)</label>
+                            <input type="text" id="cfg-office-location" placeholder="เช่น ถนนนิตโย อำเภอสว่างแดนดิน สน 47110">
+                        </div>
+                        <div class="config-field full-width">
+                            <label for="cfg-office-address">4. ที่อยู่หน่วยงาน (สถานที่ชำระเงินในเนื้อหา)</label>
+                            <input type="text" id="cfg-office-address" placeholder="เช่น เลขที่ 273/2 หมู่ที่ 20 ตำบลสว่างแดนดิน อำเภอสว่างแดนดิน จังหวัดสกลนคร">
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-signatory-name">5. ผู้ลงนาม</label>
+                            <input type="text" id="cfg-signatory-name" placeholder="เช่น นายชลาลัย ประโมสี">
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-signatory-position">ตำแหน่งผู้ลงนาม</label>
+                            <input type="text" id="cfg-signatory-position" placeholder="เช่น นักวิชาการแรงงานปฏิบัติการ">
+                        </div>
+                        <div class="config-field full-width">
+                            <label for="cfg-owner-division">6. ส่วนราชการเจ้าของเรื่อง</label>
+                            <input type="text" id="cfg-owner-division" placeholder="เช่น ส่วนงานเงินสมทบและการตรวจสอบ">
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-phone">7. โทรศัพท์</label>
+                            <input type="text" id="cfg-phone" placeholder="เช่น 0 4277 6833 ต่อ 105">
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-fax">8. โทรสาร</label>
+                            <input type="text" id="cfg-fax" placeholder="เช่น 0 4277 6834">
+                        </div>
+                    </div>
+                    <p id="cfg-status-msg" class="master-status-msg hidden"></p>
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                    <button type="button" id="reset-letter-config-btn" class="btn btn-outline" style="color: #8c2f2f; border-color: #d1b89d;">คืนค่าเริ่มต้น</button>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" id="cancel-letter-config-btn" class="btn btn-outline">ยกเลิก</button>
+                        <button type="button" id="save-letter-config-btn" class="btn btn-primary">บันทึกข้อมูล</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Main Content Grid -->
         <main class="main-content">
             <!-- Upload & Input Selection Section -->
@@ -291,9 +356,20 @@
 
             <section id="letter-section" class="letter-sheet hidden">
                 <div class="letter-mast">
-                    <p class="letter-kicker">สำนักงานประกันสังคม · หนังสือราชการ</p>
-                    <h2>พิมพ์หนังสือเตือน-เชิญ</h2>
-                    <p>คู่ฉบับตามฟอร์ม สน ๐๐๓1.1/สท</p>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <p class="letter-kicker">สำนักงานประกันสังคม · หนังสือราชการ</p>
+                            <h2>พิมพ์หนังสือเตือน-เชิญ</h2>
+                            <p id="letter-mast-subtitle">คู่ฉบับตามฟอร์ม สน ๐๐๓1.1/สท</p>
+                        </div>
+                        <button type="button" id="open-letter-config-btn" class="btn btn-secondary" style="border: 1px solid #d1b89d; background: #fff; color: #2c2118; display: inline-flex; align-items: center; gap: 6px;">
+                            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                            </svg>
+                            ⚙️ แก้ไขข้อมูลหนังสือ (8 รายการ)
+                        </button>
+                    </div>
                 </div>
                 <div class="letter-controls">
                     <div class="letter-field">
@@ -397,7 +473,7 @@
     </div>
 
     <!-- Scripts -->
-    <script src="/static/js/app.js?v=20261024b"></script>
-    <script src="/static/js/letters.js?v=20261024b"></script>
+    <script src="/static/js/app.js?v=20261026"></script>
+    <script src="/static/js/letters.js?v=20261026"></script>
 </body>
 </html>

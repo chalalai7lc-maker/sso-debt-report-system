@@ -128,6 +128,41 @@ class TestLetterDocx(unittest.TestCase):
             self.assertNotIn("fldChar", document)
             self.assertNotIn("18 กันยายน 2569", core)
 
+    def test_custom_letter_config_applied_to_docx(self):
+        cases = [{
+            "name": "บริษัทสว่างเทรดดิ้ง จำกัด",
+            "account": "4790001695",
+            "branch": "000000",
+            "periods": ["07/2569"],
+            "street": "123 ถนนตัวอย่าง",
+            "district": "สว่างแดนดิน",
+            "province": "สกลนคร",
+            "zipcode": "47110",
+        }]
+        custom_cfg = {
+            "doc_code": "สน ๙๙๙๙.9/สท",
+            "office_name": "สำนักงานประกันสังคมจังหวัดอุดรธานี สาขากุมภวาปี",
+            "office_location": "ถนนมิตรภาพ อำเภอกุมภวาปี สน 41110",
+            "office_address": "เลขที่ 999 หมู่ 9 ตำบลกุมภวาปี อำเภอกุมภวาปี จังหวัดอุดรธานี",
+            "signatory_name": "นายสมศักดิ์ รักชาติ",
+            "signatory_position": "ผู้อำนวยการสำนักงาน",
+            "owner_division": "ฝ่ายตรวจสอบและเร่งรัดหนี้สิน",
+            "phone": "0 4211 2233",
+            "fax": "0 4211 2234",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "custom.docx")
+            build_letter_docx(cases, "2026-10-26", "2026-11-26", 1, None, path, config=custom_cfg)
+            text = _docx_text(path)
+            self.assertIn("สน ๙๙๙๙.9/สท", text)
+            self.assertIn("สาขากุมภวาปี", text)
+            self.assertIn("นายสมศักดิ์ รักชาติ", text)
+            self.assertIn("ผู้อำนวยการสำนักงาน", text)
+            self.assertIn("ฝ่ายตรวจสอบและเร่งรัดหนี้สิน", text)
+            self.assertIn("0 4211 2233", text)
+            self.assertIn("0 4211 2234", text)
+            self.assertNotIn("{{", text)
+
     def test_bangkok_and_zero_zipcode_formatting(self):
         self.assertEqual(norm_zip("0"), "")
         self.assertEqual(norm_zip("0.0"), "")

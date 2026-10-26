@@ -1025,6 +1025,44 @@ body {
 .letter-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 .letter-actions .btn { width: auto; }
 
+/* Config Form Grid */
+.config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+.config-field {
+    display: flex;
+    flex-direction: column;
+}
+.config-field.full-width {
+    grid-column: 1 / -1;
+}
+.config-field label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+.config-field input {
+    background: #fff;
+    color: #172033;
+    border: 1px solid #d1b89d;
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    font-family: var(--font-thai);
+    font-size: 14px;
+}
+.config-field input:focus {
+    outline: none;
+    border-color: #8c2f2f;
+    box-shadow: 0 0 0 2px rgba(140, 47, 47, 0.15);
+}
+@media (max-width: 600px) {
+    .config-grid { grid-template-columns: 1fr; }
+}
+
 /* Workspace split: ledger desk vs letter desk */
 .desk-nav { display: flex; gap: 6px; padding: 4px; border-radius: 10px; background: rgba(23, 32, 51, 0.06); }
 .desk-tab {

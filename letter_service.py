@@ -15,6 +15,50 @@ from lxml import etree
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_PATH = os.path.join(BASE_DIR, "templates", "letter_warn_invite.docx")
+CONFIG_PATH = os.path.join(BASE_DIR, "data", "letter_config.json")
+
+DEFAULT_LETTER_CONFIG = {
+    "doc_code": "สน ๐๐๓1.1/สท",
+    "office_name": "สำนักงานประกันสังคมจังหวัดสกลนคร สาขาสว่างแดนดิน",
+    "office_location": "ถนนนิตโย อำเภอสว่างแดนดิน สน 47110",
+    "office_address": "เลขที่ 273/2 หมู่ที่ 20 ตำบลสว่างแดนดิน อำเภอสว่างแดนดิน จังหวัดสกลนคร",
+    "signatory_name": "นายชลาลัย ประโมสี",
+    "signatory_position": "นักวิชาการแรงงานปฏิบัติการ",
+    "owner_division": "ส่วนงานเงินสมทบและการตรวจสอบ",
+    "phone": "0 4277 6833 ต่อ 105",
+    "fax": "0 4277 6834",
+}
+
+
+def load_letter_config() -> Dict[str, str]:
+    """โหลดการตั้งค่าข้อมูลหนังสือราชการ หากไม่มีหรืออ่านไม่ได้ให้ใช้ default."""
+    cfg = dict(DEFAULT_LETTER_CONFIG)
+    if os.path.exists(CONFIG_PATH):
+        try:
+            import json
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+                if isinstance(saved, dict):
+                    for k in DEFAULT_LETTER_CONFIG:
+                        if k in saved and saved[k] is not None:
+                            cfg[k] = str(saved[k]).strip()
+        except Exception:
+            pass
+    return cfg
+
+
+def save_letter_config(cfg: Dict[str, Any]) -> Dict[str, str]:
+    """บันทึกการตั้งค่าข้อมูลหนังสือราชการลงไฟล์ data/letter_config.json."""
+    import json
+    merged = dict(DEFAULT_LETTER_CONFIG)
+    for k in DEFAULT_LETTER_CONFIG:
+        if k in cfg and cfg[k] is not None:
+            merged[k] = str(cfg[k]).strip()
+    os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(merged, f, ensure_ascii=False, indent=2)
+    return merged
+
 
 W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 W = f"{{{W_NS}}}"
@@ -370,12 +414,162 @@ def _apply_tokens(nodes, mapping: Dict[str, str], is_bkk: bool = False) -> None:
     for node in nodes:
         for text_node in node.iter(f"{W}t"):
             current = text_node.text or ""
+            if not current:
+                continue
             if is_bkk and current == "อ.":
-                text_node.text = "เขต"
+                current = "เขต"
             elif is_bkk and current == " จ.":
-                text_node.text = " "
+                current = " "
             elif current in mapping:
-                text_node.text = mapping[current]
+                current = mapping[current]
+            else:
+                for k, v in mapping.items():
+                    if k in current:
+                        current = current.replace(k, v)
+            text_node.text = current
+
+
+def _split_office_name(name: str) -> Tuple[str, str]:
+    """แยกชื่อหน่วยงาน 2 บรรทัดสำหรับหัวหนังสือ เช่น ('สำนักงานประกันสังคมจังหวัดสกลนคร', 'สาขาสว่างแดนดิน')."""
+    text = (name or "").strip()
+    if " สาขา" in text:
+        parts = text.split(" สาขา", 1)
+        return parts[0].strip(), f"สาขา{parts[1].strip()}"
+    return text, ""
+
+
+def _prepare_template_tokens(root) -> None:
+    """แปลงจุดข้อความราชการ 8 รายการใน document.xml เป็น token เพื่อรองรับการตั้งค่า."""
+    paras = list(root.iter(f"{W}p"))
+    if len(paras) < 52:
+        return
+
+    # 1. รหัสเอกสาร (DOC_CODE) ใน P[1] และ P[29]
+    for p_idx in (1, 29):
+        runs = list(paras[p_idx].iter(f"{W}r"))
+        if len(runs) > 6 and runs[1].find(f"{W}t") is not None:
+            runs[1].find(f"{W}t").text = "{{DOC_CODE}}"
+            for r in runs[2:7]:
+                t = r.find(f"{W}t")
+                if t is not None:
+                    t.text = ""
+
+    # 2. ชื่อหน่วยงาน 2 บรรทัดหัวกระดาษ (OFFICE_NAME_L1, OFFICE_NAME_L2)
+    # P[1] runs: run 9
+    r_p1 = list(paras[1].iter(f"{W}r"))
+    if len(r_p1) > 11 and r_p1[9].find(f"{W}t") is not None:
+        r_p1[9].find(f"{W}t").text = "{{OFFICE_NAME_L1}}"
+        for r in r_p1[10:12]:
+            t = r.find(f"{W}t")
+            if t is not None:
+                t.text = ""
+
+    # P[29] runs: run 11
+    r_p29 = list(paras[29].iter(f"{W}r"))
+    if len(r_p29) > 13 and r_p29[11].find(f"{W}t") is not None:
+        r_p29[11].find(f"{W}t").text = "{{OFFICE_NAME_L1}}"
+        for r in r_p29[12:14]:
+            t = r.find(f"{W}t")
+            if t is not None:
+                t.text = ""
+
+    # P[2] and P[30]
+    r_p2 = list(paras[2].iter(f"{W}r"))
+    if len(r_p2) > 1 and r_p2[1].find(f"{W}t") is not None:
+        r_p2[1].find(f"{W}t").text = "{{OFFICE_NAME_L2}}"
+    r_p30 = list(paras[30].iter(f"{W}r"))
+    if len(r_p30) > 1 and r_p30[1].find(f"{W}t") is not None:
+        r_p30[1].find(f"{W}t").text = "{{OFFICE_NAME_L2}}"
+
+    # 3. ที่ตั้งหน่วยงาน (OFFICE_LOCATION) ใน P[3] และ P[31]
+    for p_idx in (3, 31):
+        r_p = list(paras[p_idx].iter(f"{W}r"))
+        if len(r_p) > 1 and r_p[1].find(f"{W}t") is not None:
+            r_p[1].find(f"{W}t").text = "{{OFFICE_LOCATION}}"
+            for r in r_p[2:]:
+                t = r.find(f"{W}t")
+                if t is not None:
+                    t.text = ""
+
+    # 4. ชื่อหน่วยงานในเนื้อหา (OFFICE_NAME) ใน P[7] และ P[35]
+    r_p7 = list(paras[7].iter(f"{W}r"))
+    if len(r_p7) > 2 and r_p7[1].find(f"{W}t") is not None:
+        r_p7[1].find(f"{W}t").text = "ด้วย{{OFFICE_NAME}}"
+        t = r_p7[2].find(f"{W}t")
+        if t is not None:
+            t.text = ""
+
+    r_p35 = list(paras[35].iter(f"{W}r"))
+    if len(r_p35) > 3 and r_p35[2].find(f"{W}t") is not None:
+        r_p35[2].find(f"{W}t").text = "{{OFFICE_NAME}}"
+        t = r_p35[3].find(f"{W}t")
+        if t is not None:
+            t.text = ""
+
+    # 5. ที่อยู่หน่วยงาน (OFFICE_ADDRESS) ในหนังสือเตือน P[8]
+    r_p8 = list(paras[8].iter(f"{W}r"))
+    if len(r_p8) > 26 and r_p8[8].find(f"{W}t") is not None:
+        r_p8[8].find(f"{W}t").text = "ณ {{OFFICE_NAME}} {{OFFICE_ADDRESS}}"
+        for r in r_p8[9:27]:
+            t = r.find(f"{W}t")
+            if t is not None:
+                t.text = ""
+
+    # 6. สถานที่นัดพบในหนังสือเชิญ P[36]
+    r_p36 = list(paras[36].iter(f"{W}r"))
+    if len(r_p36) > 9 and r_p36[6].find(f"{W}t") is not None:
+        r_p36[6].find(f"{W}t").text = "{{OFFICE_NAME}}"
+        for idx in (7, 9):
+            t = r_p36[idx].find(f"{W}t")
+            if t is not None:
+                t.text = ""
+
+    # 7. ผู้ลงนามและตำแหน่ง (SIGNATORY_NAME, SIGNATORY_POSITION)
+    if len(paras) > 14:
+        r_p13 = list(paras[13].iter(f"{W}r"))
+        if len(r_p13) > 1 and r_p13[1].find(f"{W}t") is not None:
+            r_p13[1].find(f"{W}t").text = "{{SIGNATORY_NAME}}"
+        r_p14 = list(paras[14].iter(f"{W}r"))
+        if len(r_p14) > 1 and r_p14[1].find(f"{W}t") is not None:
+            r_p14[1].find(f"{W}t").text = "{{SIGNATORY_POSITION}}"
+
+    if len(paras) > 45:
+        r_p44 = list(paras[44].iter(f"{W}r"))
+        if len(r_p44) > 1 and r_p44[1].find(f"{W}t") is not None:
+            r_p44[1].find(f"{W}t").text = "{{SIGNATORY_NAME}}"
+        r_p45 = list(paras[45].iter(f"{W}r"))
+        if len(r_p45) > 1 and r_p45[1].find(f"{W}t") is not None:
+            r_p45[1].find(f"{W}t").text = "{{SIGNATORY_POSITION}}"
+
+    # 8. ส่วนราชการเจ้าของเรื่อง (OWNER_DIVISION)
+    for p_idx in (18, 49):
+        if len(paras) > p_idx:
+            r_p = list(paras[p_idx].iter(f"{W}r"))
+            if len(r_p) > 0 and r_p[0].find(f"{W}t") is not None:
+                r_p[0].find(f"{W}t").text = "{{OWNER_DIVISION}}"
+
+    # 9. โทรศัพท์ (PHONE)
+    for p_idx in (19, 50):
+        if len(paras) > p_idx:
+            r_p = list(paras[p_idx].iter(f"{W}r"))
+            if len(r_p) > 0 and r_p[0].find(f"{W}t") is not None:
+                r_p[0].find(f"{W}t").text = "โทรศัพท์  {{PHONE}}"
+                for r in r_p[1:]:
+                    t = r.find(f"{W}t")
+                    if t is not None:
+                        t.text = ""
+
+    # 10. โทรสาร (FAX)
+    for p_idx in (20, 51):
+        if len(paras) > p_idx:
+            r_p = list(paras[p_idx].iter(f"{W}r"))
+            if len(r_p) > 0 and r_p[0].find(f"{W}t") is not None:
+                r_p[0].find(f"{W}t").text = "โทรสาร  {{FAX}}"
+                for r in r_p[1:]:
+                    t = r.find(f"{W}t")
+                    if t is not None:
+                        t.text = ""
+
 
 
 def build_letter_docx(
@@ -386,6 +580,7 @@ def build_letter_docx(
     invite_start: Optional[int],
     output_path: str,
     template_path: str = TEMPLATE_PATH,
+    config: Optional[Dict[str, Any]] = None,
 ) -> str:
     if not cases:
         raise ValueError("ไม่มีรายการที่จะพิมพ์")
@@ -393,6 +588,14 @@ def build_letter_docx(
         raise ValueError("พิมพ์ได้ไม่เกิน 400 รายต่อครั้ง")
     if not os.path.exists(template_path):
         raise ValueError("ไม่พบแม่แบบหนังสือ")
+
+    cfg = load_letter_config()
+    if config:
+        for k, v in config.items():
+            if v is not None and k in DEFAULT_LETTER_CONFIG:
+                cfg[k] = str(v).strip()
+
+    office_l1, office_l2 = _split_office_name(cfg.get("office_name", ""))
 
     numbers = assign_numbers(len(cases), warn_start, invite_start)
     issue_text = format_issue_date(issue_date)
@@ -403,6 +606,7 @@ def build_letter_docx(
         extras = [(info, _clean_package_part(info.filename, zin.read(info.filename))) for info in zin.infolist() if info.filename != "word/document.xml"]
 
     root = etree.fromstring(xml)
+    _prepare_template_tokens(root)
     body = root.find("w:body", NS)
     children = list(body)
     sect = children[-1]
@@ -423,6 +627,17 @@ def build_letter_docx(
         province = "กรุงเทพมหานคร" if is_bkk else (_strip_prefix(raw_province, ("จังหวัด", "จ.")) or "-")
         warn_no, invite_no = numbers[index]
         _apply_tokens(clones, {
+            "{{DOC_CODE}}": cfg.get("doc_code", "สน ๐๐๓1.1/สท"),
+            "{{OFFICE_NAME_L1}}": office_l1,
+            "{{OFFICE_NAME_L2}}": office_l2,
+            "{{OFFICE_LOCATION}}": cfg.get("office_location", ""),
+            "{{OFFICE_NAME}}": cfg.get("office_name", ""),
+            "{{OFFICE_ADDRESS}}": cfg.get("office_address", ""),
+            "{{SIGNATORY_NAME}}": cfg.get("signatory_name", ""),
+            "{{SIGNATORY_POSITION}}": cfg.get("signatory_position", ""),
+            "{{OWNER_DIVISION}}": cfg.get("owner_division", ""),
+            "{{PHONE}}": cfg.get("phone", ""),
+            "{{FAX}}": cfg.get("fax", ""),
             "{{WARN_NO}}": format_doc_no(warn_no),
             "{{INVITE_NO}}": format_doc_no(invite_no),
             "{{ISSUE_DATE}}": issue_text,
@@ -440,6 +655,7 @@ def build_letter_docx(
         for el in clones:
             body.append(el)
     body.append(sect)
+
 
     new_xml = etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
     flat = new_xml.decode("utf-8")

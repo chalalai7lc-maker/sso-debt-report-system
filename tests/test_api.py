@@ -86,5 +86,32 @@ class TestAppAPI(unittest.TestCase):
         )
         self.assertEqual(response2.status_code, 404)
 
+    def test_letter_config_endpoints(self):
+        # 1. GET config
+        res = self.client.get("/api/letter-config")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["status"], "success")
+        self.assertIn("config", data)
+        self.assertIn("doc_code", data["config"])
+        self.assertIn("office_name", data["config"])
+
+        # 2. POST update config
+        update_payload = {
+            "doc_code": "สน ๐๐๓1.1/สท-ทดสอบ",
+            "signatory_name": "นายชลาลัย ประโมสี (ทดสอบ)",
+        }
+        res_post = self.client.post("/api/letter-config", json=update_payload)
+        self.assertEqual(res_post.status_code, 200)
+        post_data = res_post.json()
+        self.assertEqual(post_data["config"]["doc_code"], "สน ๐๐๓1.1/สท-ทดสอบ")
+        self.assertEqual(post_data["config"]["signatory_name"], "นายชลาลัย ประโมสี (ทดสอบ)")
+
+        # Restore default
+        self.client.post("/api/letter-config", json={
+            "doc_code": "สน ๐๐๓1.1/สท",
+            "signatory_name": "นายชลาลัย ประโมสี",
+        })
+
 if __name__ == "__main__":
     unittest.main()
