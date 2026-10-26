@@ -427,6 +427,8 @@ def _apply_tokens(nodes, mapping: Dict[str, str], is_bkk: bool = False) -> None:
                     if k in current:
                         current = current.replace(k, v)
             text_node.text = current
+            if current.startswith(" ") or current.endswith(" "):
+                text_node.attrib["{http://www.w3.org/XML/1998/namespace}space"] = "preserve"
 
 
 def _split_office_name(name: str) -> Tuple[str, str]:
@@ -509,11 +511,16 @@ def _prepare_template_tokens(root) -> None:
     # 5. ที่อยู่หน่วยงาน (OFFICE_ADDRESS) ในหนังสือเตือน P[8]
     r_p8 = list(paras[8].iter(f"{W}r"))
     if len(r_p8) > 26 and r_p8[8].find(f"{W}t") is not None:
-        r_p8[8].find(f"{W}t").text = "ณ {{OFFICE_NAME}} {{OFFICE_ADDRESS}} "
+        r_p8[8].find(f"{W}t").text = "ณ {{OFFICE_NAME}} {{OFFICE_ADDRESS}}"
         for r in r_p8[9:27]:
             t = r.find(f"{W}t")
             if t is not None:
                 t.text = ""
+        # เติมช่องว่างหน้า "ภายใน 30 วัน" พร้อม xml:space="preserve" เพื่อป้องกัน Word/LibreOffice ตัดช่องว่าง
+        if len(r_p8) > 27 and r_p8[27].find(f"{W}t") is not None:
+            t_w30 = r_p8[27].find(f"{W}t")
+            t_w30.text = " ภายใน 30 วัน"
+            t_w30.attrib["{http://www.w3.org/XML/1998/namespace}space"] = "preserve"
 
     # 6. สถานที่นัดพบในหนังสือเชิญ P[36]
     r_p36 = list(paras[36].iter(f"{W}r"))
