@@ -614,6 +614,24 @@ def build_letter_docx(
     for child in children:
         body.remove(child)
 
+    # หากชื่อหน่วยงานมีบรรทัดเดียว (ไม่มี office_l2) ให้นำย่อหน้าบรรทัดที่ 2 ออก
+    # เพื่อให้บรรทัดที่ตั้งขยับขึ้นมาเป็นบรรทัดที่ 2 แทน
+    if not office_l2:
+        l2_warn = None
+        l2_invite = None
+        for el in block:
+            if el.tag == f"{W}p":
+                txt = "".join(el.itertext()).strip()
+                if txt == "{{OFFICE_NAME_L2}}":
+                    if l2_warn is None:
+                        l2_warn = el
+                    else:
+                        l2_invite = el
+        if l2_warn is not None and l2_warn in block:
+            block.remove(l2_warn)
+        if l2_invite is not None and l2_invite in block:
+            block.remove(l2_invite)
+
     for index, case in enumerate(cases):
         if index:
             body.append(_page_break())

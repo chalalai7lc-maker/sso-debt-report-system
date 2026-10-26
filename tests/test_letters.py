@@ -164,6 +164,34 @@ class TestLetterDocx(unittest.TestCase):
             self.assertIn("จังหวัดอุดรธานี ภายใน 30 วัน", text)
             self.assertNotIn("{{", text)
 
+    def test_single_line_office_shifts_location_up(self):
+        cases = [{
+            "name": "บริษัทตัวอย่าง จำกัด",
+            "account": "1000000001",
+            "branch": "000000",
+            "periods": ["07/2569"],
+            "street": "123 ถนนตัวอย่าง",
+            "district": "เมือง",
+            "province": "อุดรธานี",
+            "zipcode": "41000",
+        }]
+        cfg_1line = {
+            "doc_code": "อด 0031.1/สท",
+            "office_name": "สำนักงานประกันสังคมจังหวัดอุดรธานี",
+            "office_location": "ถนนนิตโย อำเภอเมืองอุดรธานี อด 41000",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "shifted.docx")
+            build_letter_docx(cases, "2026-10-26", "2026-11-26", 1, None, path, config=cfg_1line)
+            xml = zipfile.ZipFile(path).read("word/document.xml")
+            root = etree.fromstring(xml)
+            paras = [p for p in list(root.find(f"{W}body")) if p.tag == f"{W}p"]
+            # Warn header: P[1] is doc_code + office name, P[2] should be location
+            self.assertIn("สำนักงานประกันสังคมจังหวัดอุดรธานี", "".join(paras[1].itertext()))
+            self.assertEqual("".join(paras[2].itertext()), "ถนนนิตโย อำเภอเมืองอุดรธานี อด 41000")
+            self.assertEqual("".join(paras[3].itertext()), "26 ตุลาคม 2569")
+            self.assertEqual("".join(paras[4].itertext()), "เรื่องเตือนให้ชำระเงินสมทบ")
+
     def test_bangkok_and_zero_zipcode_formatting(self):
         self.assertEqual(norm_zip("0"), "")
         self.assertEqual(norm_zip("0.0"), "")
