@@ -509,7 +509,7 @@ def _prepare_template_tokens(root) -> None:
     # 5. ที่อยู่หน่วยงาน (OFFICE_ADDRESS) ในหนังสือเตือน P[8]
     r_p8 = list(paras[8].iter(f"{W}r"))
     if len(r_p8) > 26 and r_p8[8].find(f"{W}t") is not None:
-        r_p8[8].find(f"{W}t").text = "ณ {{OFFICE_NAME}} {{OFFICE_ADDRESS}}"
+        r_p8[8].find(f"{W}t").text = "ณ {{OFFICE_NAME}} {{OFFICE_ADDRESS}} "
         for r in r_p8[9:27]:
             t = r.find(f"{W}t")
             if t is not None:

@@ -161,6 +161,7 @@ class TestLetterDocx(unittest.TestCase):
             self.assertIn("ฝ่ายตรวจสอบและเร่งรัดหนี้สิน", text)
             self.assertIn("0 4211 2233", text)
             self.assertIn("0 4211 2234", text)
+            self.assertIn("จังหวัดอุดรธานี ภายใน 30 วัน", text)
             self.assertNotIn("{{", text)
 
     def test_bangkok_and_zero_zipcode_formatting(self):
