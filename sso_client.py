@@ -2,7 +2,9 @@ import os
 import json
 import time
 import base64
+import socket
 import asyncio
+from urllib.parse import urlparse
 from typing import Optional, Dict, List, Any, Tuple
 import httpx
 from dotenv import load_dotenv
@@ -29,15 +31,43 @@ BASE_URL = "https://appssocore.sso.go.th"
 CACHE_FILE = os.path.join(_THIS_DIR, ".sso_token_cache.json")
 FALLBACK_CACHE_FILE = os.path.join(_M33_DIR, ".sso_token_cache.json")
 
+INTRANET_UNREACHABLE_MSG = (
+    "ไม่สามารถเชื่อมต่อระบบ SSO CORE ได้ เนื่องจากเซิร์ฟเวอร์ไม่ได้อยู่ในเครือข่ายอินทราเน็ต สปส. "
+    "(appssocore.sso.go.th) ระบบจะยึดข้อมูลงวดค้างชำระตามไฟล์ Excel เป็นหลัก"
+)
+
+
+def check_intranet_reachable(timeout: float = 3.0) -> bool:
+    """ตรวจสอบว่าเครื่องปัจจุบันสามารถเชื่อมต่อโครงข่ายอินทราเน็ต สปส. (appssocore.sso.go.th) ได้หรือไม่"""
+    parsed = urlparse(BASE_URL)
+    host = parsed.hostname or "appssocore.sso.go.th"
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
 
 def _fetch_token_sync(username: str, password: str) -> str:
+    if not check_intranet_reachable():
+        raise ConnectionError(INTRANET_UNREACHABLE_MSG)
+
     from playwright.sync_api import sync_playwright
     captured_token = None
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-web-security"]
-        )
+        try:
+            browser = p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-web-security"]
+            )
+        except Exception as e:
+            err_str = str(e)
+            if "Executable doesn't exist" in err_str:
+                raise RuntimeError(
+                    "ไม่พบเบราว์เซอร์ Chromium สำหรับยืนยันตัวตน SSO CORE บนเซิร์ฟเวอร์ (กรุณารัน playwright install chromium)"
+                ) from e
+            raise
         context = browser.new_context(
             viewport={"width": 1440, "height": 900},
             ignore_https_errors=True,
@@ -164,6 +194,9 @@ class SSOHybridClient:
 
     async def get_token(self, force_refresh: bool = False) -> str:
         async with self._lock:
+            if not await asyncio.to_thread(check_intranet_reachable):
+                raise ConnectionError(INTRANET_UNREACHABLE_MSG)
+
             if not force_refresh and self._is_token_valid():
                 return self.token
 

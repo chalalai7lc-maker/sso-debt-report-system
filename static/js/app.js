@@ -710,7 +710,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 await syncRecordsAndReExport("SSOCORE");
             } catch (err) {
-                alert("เกิดข้อผิดพลาดในการตรวจสอบ SSO CORE: " + err.message);
+                const msg = err.message || "ไม่สามารถเชื่อมต่อระบบ SSO CORE ได้";
+                if (ssoSummaryBanner) {
+                    ssoSummaryBanner.textContent = `⚠️ ${msg}`;
+                    ssoSummaryBanner.classList.remove("hidden");
+                }
+                alert(msg.startsWith("ไม่สามารถ") ? msg : `เกิดข้อผิดพลาดในการตรวจสอบ SSO CORE: ${msg}`);
             } finally {
                 isSsoChecking = false;
                 ssoCheckBtn.disabled = false;

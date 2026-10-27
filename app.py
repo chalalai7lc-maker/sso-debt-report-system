@@ -209,6 +209,8 @@ async def check_sso_core_overdue(req: SSOCheckRequest):
 
     try:
         await sso_client.get_token()
+    except ConnectionError as ce:
+        raise HTTPException(status_code=503, detail=str(ce))
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"ไม่สามารถเชื่อมต่อระบบยืนยันตัวตน SSO CORE ได้: {str(e)}")
 

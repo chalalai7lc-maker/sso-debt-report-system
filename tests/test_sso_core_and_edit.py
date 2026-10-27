@@ -162,6 +162,21 @@ class TestSSOCoreAndPeriodEdit(unittest.TestCase):
         self.assertIn("id=\"sso-start-year\"", html)
         self.assertIn("id=\"edit-periods-modal\"", html)
 
+    def test_sso_core_check_returns_friendly_503_when_intranet_unreachable(self):
+        import sso_client as sso_client_mod
+        with patch.object(sso_client_mod, "check_intranet_reachable", return_value=False):
+            res = self.client.post(
+                "/api/sso-core/check",
+                json={
+                    "start_year": 2568,
+                    "accounts": [{"acc": "4700012345", "branch": "000000"}]
+                }
+            )
+            self.assertEqual(res.status_code, 503)
+            detail = res.json().get("detail", "")
+            self.assertIn("เครือข่ายอินทราเน็ต สปส.", detail)
+            self.assertIn("ยึดข้อมูลงวดค้างชำระตามไฟล์ Excel เป็นหลัก", detail)
+
 
 if __name__ == "__main__":
     unittest.main()
