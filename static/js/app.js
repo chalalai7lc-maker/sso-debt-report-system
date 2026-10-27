@@ -54,6 +54,19 @@ document.addEventListener("DOMContentLoaded", () => {
     let cancelSsoCheckFlag = false;
     let currentEditingRow = null;
     let currentEditingPeriods = [];
+    let currentInputFiles = [];
+
+    // File Manager Elements
+    const openFileManagerBtn = document.getElementById("open-file-manager-btn");
+    const fileManagerModal = document.getElementById("file-manager-modal");
+    const closeFileManagerBtn = document.getElementById("close-file-manager-btn");
+    const doneFileManagerBtn = document.getElementById("done-file-manager-btn");
+    const refreshFileManagerBtn = document.getElementById("refresh-file-manager-btn");
+    const selectAllInputFiles = document.getElementById("select-all-input-files");
+    const fileManagerCountBadge = document.getElementById("file-manager-count-badge");
+    const batchDeleteBtn = document.getElementById("batch-delete-btn");
+    const selectedDeleteCount = document.getElementById("selected-delete-count");
+    const fileManagerTbody = document.getElementById("file-manager-tbody");
 
     // SSO CORE & Period Editor Elements
     const ssoStartYearInput = document.getElementById("sso-start-year");
@@ -196,7 +209,11 @@ document.addEventListener("DOMContentLoaded", () => {
             if (masterFileSize) masterFileSize.textContent = `${data.wcf_size_kb || 0} KB`;
 
             // Input Files List
-            renderInputFiles(data.input_files);
+            currentInputFiles = data.input_files || [];
+            renderInputFiles(currentInputFiles);
+            if (fileManagerModal && !fileManagerModal.classList.contains("hidden")) {
+                renderFileManagerTable();
+            }
         } catch (err) {
             console.error("System info error:", err);
             wcfStatusBadge.className = "badge badge-error";
@@ -205,20 +222,40 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function renderInputFiles(files) {
+        currentInputFiles = files || [];
         if (!files || files.length === 0) {
             inputFilesList.innerHTML = '<div class="loading-placeholder">ไม่พบไฟล์ในโฟลเดอร์ Input</div>';
+            currentSelectedExisting = null;
+            if (!currentSelectedFile) processBtn.disabled = true;
             return;
         }
 
         inputFilesList.innerHTML = "";
-        files.forEach((f, idx) => {
+
+        let activeFile = files.some(f => f.filename === currentSelectedExisting)
+            ? currentSelectedExisting
+            : files[0].filename;
+
+        currentSelectedExisting = activeFile;
+        if (!currentSelectedFile) processBtn.disabled = false;
+
+        files.forEach((f) => {
+            const isSelected = (f.filename === activeFile && !currentSelectedFile);
             const item = document.createElement("div");
-            item.className = "file-item" + (idx === 0 ? " selected" : "");
+            item.className = "file-item" + (isSelected ? " selected" : "");
             item.innerHTML = `
-                <span class="file-item-name" title="${escapeHtml(f.filename)}">
-                    📄 ${escapeHtml(f.filename)}
-                </span>
-                <span class="file-item-size">${escapeHtml(f.size_kb)} KB</span>
+                <div class="file-item-info">
+                    <span class="file-item-name" title="${escapeHtml(f.filename)}">
+                        📄 ${escapeHtml(f.filename)}
+                    </span>
+                    <span class="file-item-size">${escapeHtml(f.size_kb)} KB</span>
+                </div>
+                <button type="button" class="btn-file-delete" title="ลบไฟล์ ${escapeHtml(f.filename)}">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                </button>
             `;
 
             item.addEventListener("click", () => {
@@ -230,14 +267,197 @@ document.addEventListener("DOMContentLoaded", () => {
                 processBtn.disabled = false;
             });
 
+            const delBtn = item.querySelector(".btn-file-delete");
+            delBtn.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                await deleteSingleInputFile(f.filename);
+            });
+
             inputFilesList.appendChild(item);
         });
+    }
 
-        // Auto select first file
-        if (files.length > 0) {
-            currentSelectedExisting = files[0].filename;
-            processBtn.disabled = false;
+    async function deleteSingleInputFile(filename) {
+        if (!confirm(`คุณต้องการลบไฟล์ "${filename}" ออกจากระบบ ใช่หรือไม่?\n(ไฟล์จะถูกลบถาวรจากโฟลเดอร์ Input)`)) {
+            return;
         }
+        try {
+            const res = await fetch(`/api/files/${encodeURIComponent(filename)}`, {
+                method: "DELETE"
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.detail || data.message || "เกิดข้อผิดพลาดในการลบไฟล์");
+            }
+            if (currentSelectedExisting === filename) {
+                currentSelectedExisting = null;
+            }
+            await checkSystemInfo();
+        } catch (err) {
+            alert("ไม่สามารถลบไฟล์ได้: " + err.message);
+        }
+    }
+
+    function renderFileManagerTable() {
+        if (!fileManagerTbody) return;
+        const files = currentInputFiles || [];
+        if (fileManagerCountBadge) fileManagerCountBadge.textContent = `${files.length} ไฟล์`;
+
+        if (files.length === 0) {
+            fileManagerTbody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 25px;">
+                        ไม่พบไฟล์รายงานในโฟลเดอร์ Input
+                    </td>
+                </tr>
+            `;
+            if (selectAllInputFiles) {
+                selectAllInputFiles.checked = false;
+                selectAllInputFiles.disabled = true;
+            }
+            updateBatchDeleteState();
+            return;
+        }
+
+        if (selectAllInputFiles) {
+            selectAllInputFiles.disabled = false;
+        }
+
+        fileManagerTbody.innerHTML = "";
+        files.forEach((f) => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td style="text-align: center;">
+                    <input type="checkbox" class="file-row-checkbox" data-filename="${escapeHtml(f.filename)}">
+                </td>
+                <td>
+                    <span class="cell-mono" style="font-weight: 500;" title="${escapeHtml(f.filename)}">
+                        📄 ${escapeHtml(f.filename)}
+                    </span>
+                </td>
+                <td style="color: var(--text-muted); font-size: 12px;">${escapeHtml(f.modified || "-")}</td>
+                <td style="text-align: right; font-family: var(--font-mono); font-size: 12px;">${escapeHtml(f.size_kb)} KB</td>
+                <td style="text-align: center;">
+                    <button type="button" class="btn-delete-row" data-filename="${escapeHtml(f.filename)}" title="ลบไฟล์นี้">
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                        ลบ
+                    </button>
+                </td>
+            `;
+
+            const chk = tr.querySelector(".file-row-checkbox");
+            chk.addEventListener("change", () => {
+                updateBatchDeleteState();
+            });
+
+            const delRowBtn = tr.querySelector(".btn-delete-row");
+            delRowBtn.addEventListener("click", async () => {
+                await deleteSingleInputFile(f.filename);
+            });
+
+            fileManagerTbody.appendChild(tr);
+        });
+
+        updateBatchDeleteState();
+    }
+
+    function updateBatchDeleteState() {
+        const checkboxes = document.querySelectorAll(".file-row-checkbox");
+        const checked = Array.from(checkboxes).filter(c => c.checked);
+        const count = checked.length;
+        if (selectedDeleteCount) selectedDeleteCount.textContent = count;
+        if (batchDeleteBtn) batchDeleteBtn.disabled = (count === 0);
+        if (selectAllInputFiles && checkboxes.length > 0) {
+            selectAllInputFiles.checked = (count === checkboxes.length);
+            selectAllInputFiles.indeterminate = (count > 0 && count < checkboxes.length);
+        }
+    }
+
+    async function executeBatchDelete() {
+        const checked = Array.from(document.querySelectorAll(".file-row-checkbox:checked"))
+            .map(c => c.dataset.filename);
+        if (!checked || checked.length === 0) return;
+
+        if (!confirm(`คุณต้องการลบไฟล์ที่เลือกทั้งหมดจำนวน ${checked.length} ไฟล์ ใช่หรือไม่?\n(ไฟล์จะถูกลบถาวรจากโฟลเดอร์ Input)`)) {
+            return;
+        }
+
+        try {
+            batchDeleteBtn.disabled = true;
+            batchDeleteBtn.textContent = "กำลังลบ...";
+            const res = await fetch("/api/files/batch-delete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ filenames: checked })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.detail || data.message || "เกิดข้อผิดพลาดในการลบหลายไฟล์");
+            }
+            if (checked.includes(currentSelectedExisting)) {
+                currentSelectedExisting = null;
+            }
+            await checkSystemInfo();
+            if (data.errors && data.errors.length > 0) {
+                alert(`ลบสำเร็จ ${data.deleted.length} ไฟล์ แต่พบข้อผิดพลาด:\n` + data.errors.join("\n"));
+            }
+        } catch (err) {
+            alert("เกิดข้อผิดพลาดในการลบไฟล์: " + err.message);
+        } finally {
+            if (batchDeleteBtn) {
+                batchDeleteBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    ลบไฟล์ที่เลือก (<span id="selected-delete-count">0</span>)
+                `;
+            }
+            updateBatchDeleteState();
+        }
+    }
+
+    if (openFileManagerBtn) {
+        openFileManagerBtn.addEventListener("click", () => {
+            renderFileManagerTable();
+            if (fileManagerModal) fileManagerModal.classList.remove("hidden");
+        });
+    }
+    if (closeFileManagerBtn) {
+        closeFileManagerBtn.addEventListener("click", () => {
+            if (fileManagerModal) fileManagerModal.classList.add("hidden");
+        });
+    }
+    if (doneFileManagerBtn) {
+        doneFileManagerBtn.addEventListener("click", () => {
+            if (fileManagerModal) fileManagerModal.classList.add("hidden");
+        });
+    }
+    if (fileManagerModal) {
+        fileManagerModal.addEventListener("click", (e) => {
+            if (e.target === fileManagerModal) fileManagerModal.classList.add("hidden");
+        });
+    }
+    if (refreshFileManagerBtn) {
+        refreshFileManagerBtn.addEventListener("click", async () => {
+            await checkSystemInfo();
+            renderFileManagerTable();
+        });
+    }
+    if (selectAllInputFiles) {
+        selectAllInputFiles.addEventListener("change", (e) => {
+            const isChecked = e.target.checked;
+            document.querySelectorAll(".file-row-checkbox").forEach(c => {
+                c.checked = isChecked;
+            });
+            updateBatchDeleteState();
+        });
+    }
+    if (batchDeleteBtn) {
+        batchDeleteBtn.addEventListener("click", executeBatchDelete);
     }
 
     // 2. Drag & Drop Event Listeners

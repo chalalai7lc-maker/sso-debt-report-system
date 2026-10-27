@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20261024b">
+    <link rel="stylesheet" href="/static/css/style.css?v=20261027b">
 </head>
 <body class="desk-ledger">
     <div class="app-container">
@@ -249,9 +249,72 @@
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class=\"modal-footer\">
                     <button type="button" id="cancel-edit-periods-btn" class="btn btn-outline">ยกเลิก</button>
                     <button type="button" id="save-edit-periods-btn" class="btn btn-primary">บันทึกงวดค้างชำระ</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- File Manager Modal (เมนูลบและจัดการไฟล์ Input) -->
+        <div id="file-manager-modal" class="modal-backdrop hidden">
+            <div class="modal-card" style="max-width: 680px;">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <svg class="section-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                        เมนูลบและจัดการไฟล์รายงาน (Input Files)
+                    </h3>
+                    <button type="button" id="close-file-manager-btn" class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="file-manager-intro">
+                        รายการไฟล์รายงานหนี้ (.xlsx, .xls, .csv) ที่เคยอัปโหลดไว้ในโฟลเดอร์ Input ของระบบ สามารถเลือกลบไฟล์ที่ไม่ต้องการ เพื่อลดพื้นที่และจัดระเบียบไฟล์
+                    </p>
+                    <div class="file-manager-toolbar">
+                        <label class="select-all-label">
+                            <input type="checkbox" id="select-all-input-files">
+                            <span>เลือกทั้งหมด</span>
+                        </label>
+                        <div class="file-manager-stats">
+                            <span id="file-manager-count-badge" class="badge">0 ไฟล์</span>
+                        </div>
+                        <button type="button" id="batch-delete-btn" class="btn-danger-sm" disabled>
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                            ลบไฟล์ที่เลือก (<span id="selected-delete-count">0</span>)
+                        </button>
+                    </div>
+                    <div class="file-manager-table-wrapper">
+                        <table class="file-manager-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 38px; text-align: center;">#</th>
+                                    <th>ชื่อไฟล์</th>
+                                    <th style="width: 140px;">วันที่แก้ไข/อัปโหลด</th>
+                                    <th style="width: 85px; text-align: right;">ขนาด</th>
+                                    <th style="width: 80px; text-align: center;">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="file-manager-tbody">
+                                <tr>
+                                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">กำลังค้นหาไฟล์...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                    <button type="button" id="refresh-file-manager-btn" class="btn btn-secondary">
+                        🔄 รีเฟรชรายการ
+                    </button>
+                    <button type="button" id="done-file-manager-btn" class="btn btn-primary">
+                        ปิดหน้าต่าง
+                    </button>
                 </div>
             </div>
         </div>
@@ -293,7 +356,16 @@
 
                     <!-- Existing Files in Input Folder -->
                     <div class="existing-files-panel">
-                        <h3 class="panel-subtitle">ไฟล์ในโฟลเดอร์ Input ของระบบ</h3>
+                        <div class="existing-files-header">
+                            <h3 class="panel-subtitle">ไฟล์ในโฟลเดอร์ Input ของระบบ</h3>
+                            <button type="button" id="open-file-manager-btn" class="btn-manage-files" title="เปิดเมนูลบและจัดการไฟล์ทั้งหมด">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                                เมนูลบ/จัดการไฟล์
+                            </button>
+                        </div>
                         <div id="input-files-list" class="files-list">
                             <div class="loading-placeholder">กำลังค้นหาไฟล์...</div>
                         </div>
@@ -593,7 +665,7 @@
     </div>
 
     <!-- Scripts -->
-    <script src="/static/js/app.js?v=20261026"></script>
-    <script src="/static/js/letters.js?v=20261026"></script>
+    <script src="/static/js/app.js?v=20261027b"></script>
+    <script src="/static/js/letters.js?v=20261027b"></script>
 </body>
 </html>

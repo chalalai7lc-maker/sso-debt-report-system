@@ -113,5 +113,46 @@ class TestAppAPI(unittest.TestCase):
             "signatory_name": "นายชลาลัย ประโมสี",
         })
 
+    def test_delete_input_file_and_batch_delete(self):
+        from app import INPUT_DIR
+        # Create dummy input files for deletion test
+        f1 = os.path.join(INPUT_DIR, "test_dummy_1.xlsx")
+        f2 = os.path.join(INPUT_DIR, "test_dummy_2.xlsx")
+        with open(f1, "wb") as f:
+            f.write(b"dummy content 1")
+        with open(f2, "wb") as f:
+            f.write(b"dummy content 2")
+
+        # 1. Delete single file
+        res = self.client.delete("/api/files/test_dummy_1.xlsx")
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.json()["success"])
+        self.assertFalse(os.path.exists(f1))
+
+        # 2. Delete non-existent file
+        res_404 = self.client.delete("/api/files/test_dummy_1.xlsx")
+        self.assertEqual(res_404.status_code, 404)
+
+        # 3. Path traversal delete attempt
+        res_pt = self.client.delete("/api/files/../../app.py")
+        self.assertEqual(res_pt.status_code, 404)
+
+        # 4. Batch delete
+        f3 = os.path.join(INPUT_DIR, "test_dummy_3.xlsx")
+        with open(f3, "wb") as f:
+            f.write(b"dummy content 3")
+
+        res_batch = self.client.post("/api/files/batch-delete", json={"filenames": ["test_dummy_2.xlsx", "test_dummy_3.xlsx"]})
+        self.assertEqual(res_batch.status_code, 200)
+        self.assertTrue(res_batch.json()["success"])
+        self.assertEqual(len(res_batch.json()["deleted"]), 2)
+        self.assertFalse(os.path.exists(f2))
+        self.assertFalse(os.path.exists(f3))
+
+        # 5. Empty batch delete request
+        res_empty = self.client.post("/api/files/batch-delete", json={"filenames": []})
+        self.assertEqual(res_empty.status_code, 400)
+
+
 if __name__ == "__main__":
     unittest.main()

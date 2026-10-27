@@ -56,7 +56,7 @@ async def get_system_info():
 
     input_files = []
     if os.path.isdir(INPUT_DIR):
-        for fname in os.listdir(INPUT_DIR):
+        for fname in sorted(os.listdir(INPUT_DIR)):
             if fname.startswith(("~$", ".")):
                 continue
             if not fname.lower().endswith((".xlsx", ".xls", ".csv")):
@@ -65,10 +65,21 @@ async def get_system_info():
             if not os.path.isfile(fpath):
                 continue
             size_kb = round(os.path.getsize(fpath) / 1024, 1)
+            try:
+                mtime = os.path.getmtime(fpath)
+                mtime_str = datetime.datetime.fromtimestamp(mtime).strftime("%d/%m/%Y %H:%M")
+            except Exception:
+                mtime_str = "-"
             input_files.append({
                 "filename": fname,
-                "size_kb": size_kb
+                "size_kb": size_kb,
+                "modified": mtime_str
             })
+
+    try:
+        input_files.sort(key=lambda x: os.path.getmtime(os.path.join(INPUT_DIR, x["filename"])), reverse=True)
+    except Exception:
+        pass
 
     return {
         "wcf_connected": wcf_integrator.is_loaded,
@@ -178,6 +189,58 @@ async def download_file(filename: str):
         filename=safe_filename,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+
+@app.delete("/api/files/{filename}")
+async def delete_input_file(filename: str):
+    """ลบไฟล์รายงานที่เคยอัปโหลดในโฟลเดอร์ Input"""
+    safe_filename = os.path.basename(filename)
+    target_path = os.path.abspath(os.path.join(INPUT_DIR, safe_filename))
+    if not target_path.startswith(os.path.abspath(INPUT_DIR)) or not os.path.isfile(target_path):
+        raise HTTPException(status_code=404, detail="ไม่พบไฟล์ที่ต้องการลบในโฟลเดอร์ Input")
+
+    try:
+        os.remove(target_path)
+        return JSONResponse(content={
+            "success": True,
+            "message": f"ลบไฟล์ '{safe_filename}' สำเร็จ",
+            "filename": safe_filename
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"เกิดข้อผิดพลาดในการลบไฟล์: {str(e)}")
+
+
+class BatchDeleteRequest(BaseModel):
+    filenames: List[str]
+
+
+@app.post("/api/files/batch-delete")
+async def batch_delete_input_files(req: BatchDeleteRequest):
+    """ลบหลายไฟล์พร้อมกันจากโฟลเดอร์ Input"""
+    if not req.filenames:
+        raise HTTPException(status_code=400, detail="ไม่มีรายชื่อไฟล์ที่ต้องการลบ")
+
+    deleted = []
+    errors = []
+
+    for fname in req.filenames:
+        safe_filename = os.path.basename(fname)
+        target_path = os.path.abspath(os.path.join(INPUT_DIR, safe_filename))
+        if not target_path.startswith(os.path.abspath(INPUT_DIR)) or not os.path.isfile(target_path):
+            errors.append(f"{safe_filename}: ไม่พบไฟล์")
+            continue
+        try:
+            os.remove(target_path)
+            deleted.append(safe_filename)
+        except Exception as e:
+            errors.append(f"{safe_filename}: {str(e)}")
+
+    return JSONResponse(content={
+        "success": len(deleted) > 0,
+        "deleted": deleted,
+        "errors": errors,
+        "message": f"ลบสำเร็จ {len(deleted)} ไฟล์" + (f" (ผิดพลาด {len(errors)} ไฟล์)" if errors else "")
+    })
 
 
 class SSOCheckAccountItem(BaseModel):
