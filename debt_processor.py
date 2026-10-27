@@ -72,6 +72,35 @@ def format_period_ranges_b(period_list: List[str]) -> str:
     return ", ".join(formatted_groups)
 
 
+def normalize_and_sort_periods(period_list: List[str]) -> List[str]:
+    """
+    แปลงรายการงวดให้เป็นรูปแบบ 'MM/YYYY' และเรียงลำดับตามปี พ.ศ. และเดือน
+    """
+    parsed = []
+    fallback = []
+    for p in period_list or []:
+        if not p or not isinstance(p, str):
+            continue
+        clean = p.strip()
+        parts = clean.split("/")
+        if len(parts) == 2:
+            try:
+                m = int(parts[0])
+                y = int(parts[1])
+                if 1 <= m <= 12 and y > 0:
+                    parsed.append((y, m))
+                    continue
+            except ValueError:
+                pass
+        if clean and clean not in fallback:
+            fallback.append(clean)
+
+    sorted_unique = sorted(list(set(parsed)))
+    result = [f"{m:02d}/{y}" for (y, m) in sorted_unique]
+    result.extend(fallback)
+    return result
+
+
 def parse_float_safe(val: Any) -> float:
     """แปลงค่าตัวเลขหรือข้อความจำนวนเงินที่มีเครื่องหมายจุลภาค (,) ให้เป็น float อย่างปลอดภัย"""
     if val is None or val == "":
@@ -302,7 +331,8 @@ class DebtReportProcessor:
                 matched_wcf_count += 1
 
             # งวดเดือนค้างชำระ (แบบ B)
-            period_text = format_period_ranges_b(g["periods"])
+            clean_periods = normalize_and_sort_periods(g["periods"])
+            period_text = format_period_ranges_b(clean_periods)
             principal_debt = round(g["est_debt"] + g["real_debt"], 2)
 
             item = {
@@ -315,7 +345,7 @@ class DebtReportProcessor:
                 "อำเภอ": wcf_data.get("อำเภอ", ""),
                 "จังหวัด": wcf_data.get("จังหวัด", ""),
                 "รหัสไปรษณีย์": wcf_data.get("รหัสไปรษณีย์", ""),
-                "จำนวนงวดค้าง": len(set(g["periods"])),
+                "จำนวนงวดค้าง": len(clean_periods),
                 "งวดเดือนค้างชำระ": period_text,
                 "หนี้ประเมิน": round(g["est_debt"], 2),
                 "หนี้จริง": round(g["real_debt"], 2),
@@ -329,13 +359,16 @@ class DebtReportProcessor:
                 "ชื่อในรายงานหนี้": g["name_report"],
                 "โทรศัพท์": wcf_data.get("โทรศัพท์", ""),
                 "เลขพาณิชย์": wcf_data.get("เลขพาณิชย์", ""),
-                "งวดดิบ": sorted(set(g["periods"])),
+                "งวดดิบ": clean_periods,
+                "งวดดิบ_ต้นฉบับ": list(clean_periods),
+                "แหล่งข้อมูลงวด": "Excel",
             }
             processed_list.append(item)
 
         df_result = pd.DataFrame(processed_list)
         preview_records = df_result.to_dict(orient="records")
-        export_df = df_result.drop(columns=["งวดดิบ"], errors="ignore")
+        internal_cols = ["งวดดิบ", "งวดดิบ_ต้นฉบับ", "งวดดิบ_sso", "แหล่งข้อมูลงวด", "สถานะตรวจสอบ_SSO"]
+        export_df = df_result.drop(columns=internal_cols, errors="ignore")
 
         # จัดเตรียมบันทึกไฟล์ส่งออก
         if not output_dir:
@@ -370,6 +403,54 @@ class DebtReportProcessor:
             "output_file": output_path,
             "output_filename": excel_filename,
             "preview_data": preview_records
+        }
+
+    def re_export_records(
+        self,
+        records: List[Dict[str, Any]],
+        output_dir: Optional[str] = None,
+        source_filename: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        สร้างไฟล์ Excel ส่งออกชุดใหม่จากรายการที่ผ่านการตรวจสอบ SSO CORE หรือแก้ไขงวดค้างชำระแล้ว
+        """
+        if not records:
+            raise ValueError("ไม่มีข้อมูลรายการสำหรับส่งออก")
+
+        normalized_records = []
+        for row in records:
+            r = dict(row)
+            raw_periods = r.get("งวดดิบ") if isinstance(r.get("งวดดิบ"), list) else []
+            clean_periods = normalize_and_sort_periods(raw_periods)
+            r["งวดดิบ"] = clean_periods
+            r["จำนวนงวดค้าง"] = len(clean_periods)
+            if clean_periods:
+                r["งวดเดือนค้างชำระ"] = format_period_ranges_b(clean_periods)
+            else:
+                r["งวดเดือนค้างชำระ"] = "ชำระครบแล้ว (0 งวด)"
+            if "งวดดิบ_ต้นฉบับ" not in r:
+                r["งวดดิบ_ต้นฉบับ"] = list(clean_periods)
+            normalized_records.append(r)
+
+        df_result = pd.DataFrame(normalized_records)
+        internal_cols = ["งวดดิบ", "งวดดิบ_ต้นฉบับ", "งวดดิบ_sso", "แหล่งข้อมูลงวด", "สถานะตรวจสอบ_SSO"]
+        export_df = df_result.drop(columns=internal_cols, errors="ignore")
+
+        if not output_dir:
+            output_dir = os.path.join(os.path.dirname(__file__), "Output")
+        os.makedirs(output_dir, exist_ok=True)
+
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_base = re.sub(r"[^A-Za-z0-9_\-ก-๙]", "_", str(source_filename or "Updated").strip()) or "Updated"
+        excel_filename = f"Debt_Processed_{safe_base}_{timestamp}.xlsx"
+        output_path = os.path.join(output_dir, excel_filename)
+        self.export_to_excel(export_df, output_path)
+
+        return {
+            "success": True,
+            "output_file": output_path,
+            "output_filename": excel_filename,
+            "preview_data": normalized_records
         }
 
     def export_to_excel(self, df: pd.DataFrame, output_path: str):

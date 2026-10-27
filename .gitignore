@@ -3,4 +3,7 @@ __pycache__/
 .pytest_cache/
 Output/Debt_Processed_*
 Output/Letter_Batch_*
+.env
+.sso_token_cache.json
+
 

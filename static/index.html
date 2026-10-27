@@ -173,6 +173,89 @@
             </div>
         </div>
 
+        <!-- Edit Overdue Periods Modal -->
+        <div id="edit-periods-modal" class="modal-backdrop hidden">
+            <div class="modal-card" style="max-width: 660px;">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                        </svg>
+                        แก้ไขงวดเดือนค้างชำระก่อนพิมพ์หนังสือ / ส่งออก
+                    </h3>
+                    <button type="button" id="close-edit-periods-btn" class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="master-info-box" style="margin-bottom: 14px;">
+                        <div class="info-row">
+                            <span class="info-label">เลขที่บัญชี / สาขา:</span>
+                            <span id="edit-period-acc" class="info-val cell-mono text-bold">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">ชื่อสถานประกอบการ:</span>
+                            <span id="edit-period-name" class="info-val text-bold">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">งวดจากรายงาน Excel เดิม:</span>
+                            <span id="edit-period-excel-ref" class="info-val cell-mono">-</span>
+                        </div>
+                        <div class="info-row" id="edit-period-sso-row">
+                            <span class="info-label">งวดจากระบบ SSO CORE:</span>
+                            <span id="edit-period-sso-ref" class="info-val cell-mono">ยังไม่ได้ตรวจสอบ</span>
+                        </div>
+                    </div>
+
+                    <div class="period-editor-section">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+                            <label style="font-weight: 600; font-size: 0.95rem;">รายการงวดค้างชำระที่ใช้อ้างอิง (<span id="edit-period-count">0</span> งวด)</label>
+                            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                <button type="button" id="restore-excel-periods-btn" class="btn btn-outline btn-sm">คืนค่าตาม Excel</button>
+                                <button type="button" id="restore-sso-periods-btn" class="btn btn-outline btn-sm hidden">คืนค่าตาม SSO CORE</button>
+                                <button type="button" id="clear-all-periods-btn" class="btn btn-outline btn-sm" style="color: #b91c1c;">ล้างทั้งหมด (0 งวด)</button>
+                            </div>
+                        </div>
+
+                        <div id="edit-period-chips" class="period-chips-box"></div>
+
+                        <div class="period-add-bar">
+                            <div class="period-add-group">
+                                <select id="add-period-month" class="period-select">
+                                    <option value="01">01 - มกราคม</option>
+                                    <option value="02">02 - กุมภาพันธ์</option>
+                                    <option value="03">03 - มีนาคม</option>
+                                    <option value="04">04 - เมษายน</option>
+                                    <option value="05">05 - พฤษภาคม</option>
+                                    <option value="06">06 - มิถุนายน</option>
+                                    <option value="07">07 - กรกฎาคม</option>
+                                    <option value="08">08 - สิงหาคม</option>
+                                    <option value="09">09 - กันยายน</option>
+                                    <option value="10">10 - ตุลาคม</option>
+                                    <option value="11">11 - พฤศจิกายน</option>
+                                    <option value="12">12 - ธันวาคม</option>
+                                </select>
+                                <input type="number" id="add-period-year" class="period-year-input" min="2530" max="2600" value="2569" placeholder="ปี พ.ศ.">
+                                <button type="button" id="add-single-period-btn" class="btn btn-secondary btn-sm">+ เพิ่มงวด</button>
+                            </div>
+                            <div class="period-add-group" style="flex: 1;">
+                                <input type="text" id="add-period-text" class="period-text-input" placeholder="หรือพิมพ์งวด เช่น 01/2569, 02/2569 หรือ 01/2569-05/2569">
+                                <button type="button" id="add-text-period-btn" class="btn btn-outline btn-sm">เพิ่มจากข้อความ</button>
+                            </div>
+                        </div>
+
+                        <div class="period-preview-box">
+                            <div><strong>แสดงในรายงาน/Excel:</strong> <span id="edit-period-preview-b">-</span></div>
+                            <div style="margin-top: 4px;"><strong>แสดงในหนังสือเตือน/เชิญ:</strong> <span id="edit-period-preview-letter">-</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="cancel-edit-periods-btn" class="btn btn-outline">ยกเลิก</button>
+                    <button type="button" id="save-edit-periods-btn" class="btn btn-primary">บันทึกงวดค้างชำระ</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Main Content Grid -->
         <main class="main-content">
             <!-- Upload & Input Selection Section -->
@@ -288,6 +371,42 @@
                     </div>
                 </div>
 
+                <!-- SSO CORE Verification Toolbar Card -->
+                <div class="card sso-core-card" id="sso-core-card">
+                    <div class="sso-core-bar">
+                        <div class="sso-core-left">
+                            <div class="sso-core-title-row">
+                                <span class="sso-core-badge">SSO CORE Intranet</span>
+                                <strong>ตรวจสอบงวดค้างชำระจริงจากระบบ SSO CORE (มาตรา 33)</strong>
+                            </div>
+                            <p class="sso-core-desc">เลือกตรวจสอบได้ตามต้องการ: หากกดตรวจสอบ ระบบจะดึงงวดค้างชำระจริงและกรองวันเปิด/ปิดกิจการจาก SSO CORE มาใช้อ้างอิงพิมพ์หนังสือและส่งออก Excel หรือสลับกลับไปใช้ข้อมูลจากไฟล์ Excel เดิมได้ตลอดเวลา</p>
+                        </div>
+                        <div class="sso-core-controls">
+                            <div class="sso-year-field">
+                                <label for="sso-start-year">ตั้งแต่ปี พ.ศ.</label>
+                                <input type="number" id="sso-start-year" min="2533" max="2600" value="2568" class="sso-year-input">
+                            </div>
+                            <button type="button" id="sso-check-btn" class="btn btn-primary">
+                                🔍 ตรวจสอบ SSO CORE
+                            </button>
+                            <button type="button" id="sso-cancel-btn" class="btn btn-outline hidden" style="color: #b91c1c; border-color: #fca5a5;">
+                                หยุดตรวจสอบ
+                            </button>
+                            <div id="period-source-switch" class="period-source-switch hidden" role="group" aria-label="เลือกแหล่งข้อมูลงวด">
+                                <button type="button" id="period-source-excel-btn" class="source-switch-btn">ยึดตาม Excel</button>
+                                <button type="button" id="period-source-sso-btn" class="source-switch-btn is-active">ยึดตาม SSO CORE</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="sso-progress-wrap" class="progress-container hidden" style="margin-top: 12px;">
+                        <div class="progress-bar-wrapper">
+                            <div id="sso-progress-bar" class="progress-bar" style="width: 0%;"></div>
+                        </div>
+                        <p id="sso-progress-status" class="progress-status-text">กำลังเชื่อมต่อ SSO CORE...</p>
+                    </div>
+                    <div id="sso-summary-banner" class="sso-summary-banner hidden"></div>
+                </div>
+
                 <!-- Table Preview Card -->
                 <div class="card table-card">
                     <div class="table-toolbar">
@@ -340,6 +459,7 @@
                                     <th>รหัสไปรษณีย์</th>
                                     <th>จำนวนงวด</th>
                                     <th>งวดเดือนค้างชำระ (แบบ B)</th>
+                                    <th>จัดการงวด</th>
                                     <th class="text-right">ยอดหนี้ไม่รวมเงินเพิ่ม</th>
                                     <th class="text-right">เงินเพิ่ม</th>
                                     <th class="text-right">ยอดรวมทั้งสิ้น</th>

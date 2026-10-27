@@ -302,13 +302,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function printSet(visible) {
         const scope = scopeValue();
+        const hasPositivePeriods = (row) => periodList(row).length >= 1 && Number(row["จำนวนงวดค้าง"] ?? periodList(row).length) >= 1;
         if (scope === "selected") {
-            return sortRows(records.filter((row) => selected.has(rowKey(row))));
+            return sortRows(records.filter((row) => selected.has(rowKey(row)) && hasPositivePeriods(row)));
         }
         if (scope === "ge2") {
-            return sortRows(visible.filter((row) => Number(row["จำนวนงวดค้าง"] || 0) >= 2));
+            return sortRows(visible.filter((row) => Number(row["จำนวนงวดค้าง"] || 0) >= 2 && hasPositivePeriods(row)));
         }
-        return sortRows(visible);
+        return sortRows(visible.filter(hasPositivePeriods));
+    }
+
+    function getSourceBadgeHtml(source) {
+        if (source === "SSO CORE") return `<span class="source-tag source-tag-sso">SSO CORE</span>`;
+        if (source === "แก้ไขเอง") return `<span class="source-tag source-tag-custom">แก้ไขเอง</span>`;
+        return `<span class="source-tag source-tag-excel">Excel</span>`;
     }
 
     function fillStatusOptions() {
@@ -346,13 +353,21 @@ document.addEventListener("DOMContentLoaded", () => {
             const key = rowKey(row);
             const nums = numberByKey.get(key);
             const checked = selected.has(key) ? "checked" : "";
+            const refKey = row["เลขอ้างอิง"] || `${row["เลขที่บัญชี"]};${row["สาขา"]}`;
+            const pList = periodList(row);
+            const periodHtml = pList.length === 0
+                ? `<span class="paid-zero-badge">ชำระครบแล้ว (0 งวด)</span> ${getSourceBadgeHtml(row["แหล่งข้อมูลงวด"])}`
+                : `${escapeHtml(formatPeriodsLetter(pList))} ${getSourceBadgeHtml(row["แหล่งข้อมูลงวด"])}`;
             return `<tr>
                 <td class="text-center"><input type="checkbox" data-key="${escapeHtml(key)}" ${checked}></td>
                 <td class="cell-mono">${escapeHtml(row["เลขที่บัญชี"] || "")}<br>${escapeHtml(row["สาขา"] || "")}</td>
                 <td>${escapeHtml(displayName(row))}</td>
                 <td class="text-center">${escapeHtml(row["สถานะ สปก."] || "-")}</td>
-                <td class="text-center cell-mono">${escapeHtml(row["จำนวนงวดค้าง"] ?? "")}</td>
-                <td>${escapeHtml(formatPeriodsLetter(periodList(row)))}</td>
+                <td class="text-center cell-mono">${escapeHtml(row["จำนวนงวดค้าง"] ?? pList.length)}</td>
+                <td>${periodHtml}</td>
+                <td class="text-center">
+                    <button type="button" class="btn-edit-period" data-edit-ref="${escapeHtml(refKey)}" title="แก้ไขงวดค้างชำระ">✏️ แก้ไขงวด</button>
+                </td>
                 <td class="text-center cell-mono">${nums ? formatDocNo(nums.warn) : "—"}</td>
                 <td class="text-center cell-mono">${nums ? formatDocNo(nums.invite) : "—"}</td>
             </tr>`;
@@ -361,8 +376,16 @@ document.addEventListener("DOMContentLoaded", () => {
         wrap.innerHTML = `<table class="data-table"><thead><tr>
             <th><input type="checkbox" id="letter-check-all"></th>
             <th>บัญชี / สาขา</th><th>ชื่อสถานประกอบการ</th><th>สถานะ</th>
-            <th>งวด</th><th>งวดเดือน</th><th>เลขเตือน</th><th>เลขเชิญ</th>
-        </tr></thead><tbody>${body || `<tr><td colspan="8" class="text-center">ไม่พบรายการตามตัวกรอง</td></tr>`}</tbody></table>`;
+            <th>งวด</th><th>งวดเดือน</th><th>จัดการงวด</th><th>เลขเตือน</th><th>เลขเชิญ</th>
+        </tr></thead><tbody>${body || `<tr><td colspan="9" class="text-center">ไม่พบรายการตามตัวกรอง</td></tr>`}</tbody></table>`;
+
+        wrap.querySelectorAll("button[data-edit-ref]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                document.dispatchEvent(new CustomEvent("debt:open-edit-period", {
+                    detail: { refKey: btn.getAttribute("data-edit-ref") }
+                }));
+            });
+        });
 
         wrap.querySelectorAll("input[data-key]").forEach((box) => {
             box.addEventListener("change", () => {
@@ -516,8 +539,18 @@ document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener("debt:ready", (event) => {
         records = event.detail || [];
         selected = new Set();
+        const minPeriodsInput = document.getElementById("letter-min-periods");
+        if (minPeriodsInput && minPeriodsInput.value === "") {
+            minPeriodsInput.value = "1";
+        }
         fillStatusOptions();
         section.classList.add("hidden");
+        render();
+    });
+
+    document.addEventListener("debt:updated", (event) => {
+        records = event.detail || [];
+        fillStatusOptions();
         render();
     });
 });

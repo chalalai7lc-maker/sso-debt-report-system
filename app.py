@@ -2,14 +2,15 @@ import os
 import shutil
 import datetime
 import tempfile
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-from debt_processor import DebtReportProcessor
+from debt_processor import DebtReportProcessor, format_period_ranges_b, normalize_and_sort_periods
 from wcf_integrator import WCFIntegrator, LOCAL_WCF_EXCEL, LOCAL_DATA_DIR
+from sso_client import SSOHybridClient
 from letter_service import (
     build_letter_docx,
     docx_to_pdf,
@@ -33,9 +34,10 @@ app = FastAPI(title="SSO Debt Report System", version="1.0.0")
 # Serve static assets
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# Shared Processor & WCF Integrator Instance
+# Shared Processor & WCF Integrator & SSO Client Instance
 wcf_integrator = WCFIntegrator()
 processor = DebtReportProcessor(wcf_integrator=wcf_integrator)
+sso_client = SSOHybridClient()
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
@@ -176,6 +178,114 @@ async def download_file(filename: str):
         filename=safe_filename,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+
+class SSOCheckAccountItem(BaseModel):
+    acc: str
+    branch: str = "000000"
+
+
+class SSOCheckRequest(BaseModel):
+    accounts: List[SSOCheckAccountItem]
+    start_year: int = 2568
+    as_of_date: Optional[str] = None
+
+
+@app.post("/api/sso-core/check")
+async def check_sso_core_overdue(req: SSOCheckRequest):
+    """
+    ตรวจสอบงวดค้างชำระจริงจากระบบ SSO CORE รายบัญชี (อ้างอิงลอจิก SSO_M33_Overdue_System)
+    """
+    if not req.accounts:
+        raise HTTPException(status_code=400, detail="ไม่มีรายการบัญชีที่เลือกสำหรับตรวจสอบ")
+
+    as_of_d = None
+    if req.as_of_date:
+        try:
+            parts = [int(p) for p in req.as_of_date.split("-")]
+            as_of_d = datetime.date(parts[0], parts[1], parts[2])
+        except Exception:
+            as_of_d = None
+
+    try:
+        await sso_client.get_token()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"ไม่สามารถเชื่อมต่อระบบยืนยันตัวตน SSO CORE ได้: {str(e)}")
+
+    results = []
+    for item in req.accounts:
+        raw_acc = str(item.acc or "").strip()
+        raw_br = str(item.branch or "000000").strip() or "000000"
+        res = await sso_client.check_account_overdue(
+            company_no=raw_acc,
+            branch_code=raw_br,
+            start_year=req.start_year,
+            as_of_date=as_of_d
+        )
+        overdue_periods = normalize_and_sort_periods(res.get("overdue_periods") or [])
+        overdue_count = len(overdue_periods)
+        process_status = res.get("process_status", "")
+
+        if "ไม่พบข้อมูล" in process_status or res.get("company_status") == "ไม่พบบัญชี":
+            period_text_b = "ไม่พบบัญชีใน SSO CORE"
+            badge = "ไม่พบบัญชี"
+        elif "เกิดข้อผิดพลาด" in process_status:
+            period_text_b = process_status
+            badge = "ตรวจสอบผิดพลาด"
+        elif overdue_count == 0:
+            period_text_b = "ชำระครบแล้ว (0 งวด)"
+            badge = "ชำระครบแล้ว (0 งวด)"
+        else:
+            period_text_b = format_period_ranges_b(overdue_periods)
+            badge = f"ค้างชำระ {overdue_count} งวด"
+
+        results.append({
+            "acc": raw_acc,
+            "branch": raw_br,
+            "key": f"{raw_acc};{raw_br}",
+            "overdue_periods": overdue_periods,
+            "overdue_count": overdue_count,
+            "period_text_b": period_text_b,
+            "sso_check_badge": badge,
+            "company_name_sso": res.get("company_name", "-"),
+            "company_status_sso": res.get("company_status", "-"),
+            "latest_paid_period": res.get("latest_paid_period", "-"),
+            "is_suspect": bool(res.get("is_suspect")),
+            "reg_timeline_summary": res.get("reg_timeline_summary", "-"),
+            "process_status": process_status,
+        })
+
+    return {
+        "success": True,
+        "start_year": req.start_year,
+        "total_checked": len(results),
+        "results": results,
+    }
+
+
+class ReExportRequest(BaseModel):
+    records: List[Dict[str, Any]]
+    source_filename: Optional[str] = "Updated"
+
+
+@app.post("/api/records/re-export")
+async def re_export_records(req: ReExportRequest):
+    """
+    สร้างไฟล์ Excel (.xlsx) ชุดใหม่จากข้อมูลงวดค้างชำระที่ผ่านการตรวจสอบ SSO CORE หรือแก้ไขงวดแล้ว
+    """
+    if not req.records:
+        raise HTTPException(status_code=400, detail="ไม่มีข้อมูลรายการสำหรับส่งออก")
+    try:
+        res = processor.re_export_records(
+            records=req.records,
+            output_dir=OUTPUT_DIR,
+            source_filename=req.source_filename
+        )
+        return JSONResponse(content=res)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"ไม่สามารถส่งออกไฟล์อัปเดตได้: {str(e)}")
 
 
 class LetterCaseIn(BaseModel):
