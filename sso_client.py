@@ -143,6 +143,17 @@ def _fetch_token_sync(username: str, password: str) -> str:
     return captured_token
 
 
+
+def tls_verify_setting():
+    """TLS verification for SSO API calls. Always on.
+    Optional: set SSO_CA_BUNDLE to a CA bundle path if SSO uses a private CA."""
+    ca = os.environ.get("SSO_CA_BUNDLE", "").strip()
+    if ca:
+        if not os.path.isfile(ca):
+            raise RuntimeError(f"SSO_CA_BUNDLE not found: {ca}")
+        return ca
+    return True
+
 class SSOHybridClient:
     def __init__(self, username: Optional[str] = None, password: Optional[str] = None):
         self.username = username or SSO_USERNAME
@@ -223,7 +234,7 @@ class SSOHybridClient:
         }
         url = f"{BASE_URL}{path}"
 
-        async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
+        async with httpx.AsyncClient(verify=tls_verify_setting(), timeout=30.0) as client:
             resp = await client.request(method, url, json=json_data, params=params, headers=headers)
 
             if resp.status_code == 401:
