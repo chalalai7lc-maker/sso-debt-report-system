@@ -59,6 +59,8 @@ No new credential. Optional: if SSO Core uses a private CA, add `SSO_CA_BUNDLE=/
 - TLS behaviour after deploy: httpx verifies TLS. Playwright login uses `ignore_https_errors=False` (it was hard-coded True). If `SSO_CA_BUNDLE` is set, it must exist and parse as PEM, **otherwise the app refuses to start** (fail-closed at import of app.py). Playwright/Chromium cannot take a CA file, so with a private CA also add it to the NSS store: `certutil -d sql:$HOME/.pki/nssdb -A -t C,, -n sso-ca -i <ca.pem>`.
 - Out of scope, waiting for Boss: API auth, disabling /docs, /redoc and /openapi.json, and the bind change. Bind analysis: keep the current setup. Traefik (container 10.0.2.9) reaches the app via the host bridge 10.0.2.1:8001, so binding to 127.0.0.1 would break the route. Restricting to 10.0.2.1 or a firewall rule is a later decision.
 
+- `python-dotenv`: checked read-only in the live venv (`$LIVE/.venv/bin/python -m pip show python-dotenv` gives **1.2.4**, which meets `>=1.0.0` in requirements.txt). **No pip install step is needed.** Re-check before deploying: `$LIVE/.venv/bin/python -c "import dotenv"` must exit 0.
+
 ## 4. Stage (from the R&D clone, not the live repo)
 ```bash
 # run sections 4-6 and 9 in ONE shell session (TS/STAGE/LIVE are reused)
