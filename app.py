@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from debt_processor import DebtReportProcessor, format_period_ranges_b, normalize_and_sort_periods
 from wcf_integrator import WCFIntegrator, LOCAL_WCF_EXCEL, LOCAL_DATA_DIR
-from sso_client import SSOHybridClient
+from sso_client import SSOHybridClient, validate_tls_config
 from letter_service import (
     build_letter_docx,
     docx_to_pdf,
@@ -29,6 +29,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(LOCAL_DATA_DIR, exist_ok=True)
 os.makedirs(STATIC_DIR, exist_ok=True)
 
+validate_tls_config()  # fail-closed on a bad SSO_CA_BUNDLE at startup
 app = FastAPI(title="SSO Debt Report System", version="1.0.0")
 
 # Serve static assets

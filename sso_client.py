@@ -3,6 +3,7 @@ import json
 import time
 import base64
 import socket
+import ssl
 import asyncio
 from urllib.parse import urlparse
 from typing import Optional, Dict, List, Any, Tuple
@@ -70,7 +71,7 @@ def _fetch_token_sync(username: str, password: str) -> str:
             raise
         context = browser.new_context(
             viewport={"width": 1440, "height": 900},
-            ignore_https_errors=True,
+            ignore_https_errors=playwright_ignore_https_errors(),
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
         )
         page = context.new_page()
@@ -146,13 +147,32 @@ def _fetch_token_sync(username: str, password: str) -> str:
 
 def tls_verify_setting():
     """TLS verification for SSO API calls. Always on.
-    Optional: set SSO_CA_BUNDLE to a CA bundle path if SSO uses a private CA."""
+    Optional: set SSO_CA_BUNDLE to a PEM CA bundle path if SSO uses a private CA.
+    Fail-closed: a missing or unparsable bundle raises RuntimeError."""
     ca = os.environ.get("SSO_CA_BUNDLE", "").strip()
     if ca:
         if not os.path.isfile(ca):
             raise RuntimeError(f"SSO_CA_BUNDLE not found: {ca}")
+        try:
+            ssl.create_default_context(cafile=ca)
+        except (ssl.SSLError, OSError, ValueError) as e:
+            raise RuntimeError(f"SSO_CA_BUNDLE is not a valid PEM CA bundle: {ca}") from e
         return ca
     return True
+
+
+def playwright_ignore_https_errors() -> bool:
+    """Playwright never ignores TLS errors. It validates SSO_CA_BUNDLE (fail-closed) but cannot
+    load a CA file itself: with a private CA, add it to the OS/NSS trust store used by Chromium
+    (e.g. certutil -d sql:$HOME/.pki/nssdb -A -t C,, -n sso-ca -i <ca.pem>)."""
+    tls_verify_setting()
+    return False
+
+
+def validate_tls_config() -> None:
+    """Called at app startup so a bad SSO_CA_BUNDLE stops the service instead of failing later."""
+    tls_verify_setting()
+
 
 class SSOHybridClient:
     def __init__(self, username: Optional[str] = None, password: Optional[str] = None):
