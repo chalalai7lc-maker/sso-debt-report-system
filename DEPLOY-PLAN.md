@@ -1,13 +1,14 @@
-# DEPLOY PLAN: SSO_Debt_Report_System (fix/tls-verify @ 246d93f)
+# DEPLOY PLAN: SSO_Debt_Report_System (fix/tls-verify @ 1154f6b)
 
 Status: **waiting for PM review and Boss approval.** Nothing has been deployed.
 Live dir: `/home/ubuntu/projects/SSO_Debt_Report_System` (live HEAD `95dce4c`) · systemd unit: `sso-debt-report.service` · port 8001
-Rules: **no git merge/reset/checkout/stash in the live dir.** Files are copied one by one from `git archive 246d93f`. Restart is a separate step that needs approval.
-The deploy contains only code commit `246d93f`. This DEPLOY-PLAN.md is not deployed.
+Rules: **no git merge/reset/checkout/stash in the live dir.** Files are copied one by one from `git archive 1154f6b`. Restart is a separate step that needs approval.
+The deploy contains only code commit `1154f6b`. This DEPLOY-PLAN.md is not deployed.
 
 ## 0. Files to deploy
 Modified (existing in live):
 ```
+app.py
 requirements.txt
 sso_client.py
 ```
@@ -29,6 +30,7 @@ Re-run this check right before deploying. It must print `OK no overlap`:
 ```bash
 LIVE=/home/ubuntu/projects/SSO_Debt_Report_System
 cat > /tmp/SSO_Debt_Report_System-deploy-files.txt <<'EOF'
+app.py
 requirements.txt
 sso_client.py
 tests/test_tls_verify.py
@@ -41,6 +43,7 @@ tests/test_tls_verify.py
 EOF
 # modified files must still match the base commit (nobody edited them):
 while read f; do [ "$(git -C "$LIVE" rev-parse 95dce4c:"$f")" = "$(git -C "$LIVE" hash-object "$LIVE/$f")" ] || echo "STOP: $f differs from 95dce4c"; done <<'EOF'
+app.py
 requirements.txt
 sso_client.py
 EOF
@@ -53,23 +56,26 @@ No new credential. Optional: if SSO Core uses a private CA, add `SSO_CA_BUNDLE=/
 - The prod venv still has `httpx2` installed (harmless). Removing it from requirements.txt does not uninstall it; leave it, or `pip uninstall httpx2` later as a separate, approved step.
 - Before restart, verify that the SSO cert validates: `$LIVE/.venv/bin/python -c "import httpx,sso_client as s;print(httpx.get(s.BASE_URL, verify=True, timeout=15).status_code)"`. Any HTTP code is OK; an SSL error is not. If you get an SSL error, get the CA first and set SSO_CA_BUNDLE.
 
+- TLS behaviour after deploy: httpx verifies TLS. Playwright login uses `ignore_https_errors=False` (it was hard-coded True). If `SSO_CA_BUNDLE` is set, it must exist and parse as PEM, **otherwise the app refuses to start** (fail-closed at import of app.py). Playwright/Chromium cannot take a CA file, so with a private CA also add it to the NSS store: `certutil -d sql:$HOME/.pki/nssdb -A -t C,, -n sso-ca -i <ca.pem>`.
+- Out of scope, waiting for Boss: API auth, disabling /docs, /redoc and /openapi.json, and the bind change. Bind analysis: keep the current setup. Traefik (container 10.0.2.9) reaches the app via the host bridge 10.0.2.1:8001, so binding to 127.0.0.1 would break the route. Restricting to 10.0.2.1 or a firewall rule is a later decision.
+
 ## 4. Stage (from the R&D clone, not the live repo)
 ```bash
 # run sections 4-6 and 9 in ONE shell session (TS/STAGE/LIVE are reused)
 TS=$(date +%Y%m%d-%H%M%S); CLONE=/home/ubuntu/worktrees/SSO_Debt_Report_System-sec; LIVE=/home/ubuntu/projects/SSO_Debt_Report_System
 STAGE=/home/ubuntu/staging/SSO_Debt_Report_System-$TS; mkdir -p "$STAGE"
-git -C "$CLONE" fetch -q origin fix/tls-verify && test "$(git -C "$CLONE" rev-parse --short=7 246d93f)" = "246d93f"
-git -C "$CLONE" archive 246d93f $(tr '\n' ' ' < /tmp/SSO_Debt_Report_System-deploy-files.txt) | tar -x -C "$STAGE"
+git -C "$CLONE" fetch -q origin fix/tls-verify && test "$(git -C "$CLONE" rev-parse --short=7 1154f6b)" = "1154f6b"
+git -C "$CLONE" archive 1154f6b $(tr '\n' ' ' < /tmp/SSO_Debt_Report_System-deploy-files.txt) | tar -x -C "$STAGE"
 ( cd "$STAGE" && sha256sum $(cat /tmp/SSO_Debt_Report_System-deploy-files.txt) ) > "$STAGE.sha256"
 # verify that staging matches git blobs exactly:
-while read f; do [ "$(git -C "$CLONE" rev-parse 246d93f:"$f")" = "$(git hash-object "$STAGE/$f")" ] || echo "BAD $f"; done < /tmp/SSO_Debt_Report_System-deploy-files.txt
-cd "$STAGE" && $LIVE/.venv/bin/python -m pytest -q -p no:cacheprovider tests/test_tls_verify.py
+while read f; do [ "$(git -C "$CLONE" rev-parse 1154f6b:"$f")" = "$(git hash-object "$STAGE/$f")" ] || echo "BAD $f"; done < /tmp/SSO_Debt_Report_System-deploy-files.txt
+cd "$STAGE" && $LIVE/.venv/bin/python -m pytest -q -p no:cacheprovider tests/test_tls_verify.py   # expect 9 passed (full suite: 41)
 ```
 
 ## 5. Backup originals
 ```bash
 mkdir -p ~/archive
-tar -czf ~/archive/SSO_Debt_Report_System-predeploy-$TS.tgz -C "$LIVE" requirements.txt sso_client.py
+tar -czf ~/archive/SSO_Debt_Report_System-predeploy-$TS.tgz -C "$LIVE" app.py requirements.txt sso_client.py
 tar -tzf ~/archive/SSO_Debt_Report_System-predeploy-$TS.tgz      # must list every modified file
 printf '%s\n' tests/test_tls_verify.py > ~/archive/SSO_Debt_Report_System-added-$TS.txt
 ```
