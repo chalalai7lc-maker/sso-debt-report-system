@@ -115,3 +115,6 @@ while read f; do rm -f "$LIVE/$f"; done < ~/archive/SSO_Debt_Report_System-added
 sudo systemctl restart sso-debt-report.service          # needs approval, same as step 7
 ```
 Credential files in ~/.config can stay; the old code ignores them.
+
+## 10. DNS note
+appssocore.sso.go.th resolves only via internal org DNS (office machines); the SSO connection can't be tested from the VPS (Boss, 29 Oct 2026).
